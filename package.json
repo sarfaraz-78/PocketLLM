@@ -10,15 +10,30 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^3.1.0",
+    "@react-native-community/slider": "^5.2.0",
+    "@react-navigation/bottom-tabs": "^7.16.2",
+    "@react-navigation/native": "^7.2.5",
+    "@react-navigation/stack": "^7.9.3",
+    "llama.rn": "^0.12.4",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-native": "0.79.2",
+    "react-native-device-info": "^15.0.2",
+    "react-native-document-picker": "^9.3.1",
+    "react-native-fs": "^2.20.0",
+    "react-native-gesture-handler": "^2.21.2",
+    "react-native-markdown-display": "^7.0.2",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-screens": "^4.10.0",
+    "react-native-vector-icons": "^10.3.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
-    "@react-native-community/cli": "18.0.0",
-    "@react-native-community/cli-platform-android": "18.0.0",
+    "@react-native-community/cli": "^18.0.0",
+    "@react-native-community/cli-platform-android": "^18.0.0",
     "@react-native-community/cli-platform-ios": "18.0.0",
     "@react-native/babel-preset": "0.79.2",
     "@react-native/eslint-config": "0.79.2",

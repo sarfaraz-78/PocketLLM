@@ -1,0 +1,1 @@
+export const STOP_WORDS = [  'EOS',  'END',  'EOT',  'ENDOFTURN',  'EOTID',  'ENDOFTEXT',  'ENDOFQUERY',  'ENDOFRESPONSE',]; 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -226,10 +226,21 @@ interface SliderSettingProps {
 const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
   const [dragging, setDragging] = useState(false);
   const [display, setDisplay] = useState(value);
+  const lastValueRef = useRef(value);
 
-  const formatVal = (v: number) => {
-    if (step && step >= 1) return Math.round(v).toString();
-    return v.toFixed(2);
+  useEffect(() => {
+    if (!dragging && value !== lastValueRef.current) {
+      lastValueRef.current = value;
+      setDisplay(value);
+    }
+  }, [value, dragging]);
+
+  const handleComplete = (v: number) => {
+    const final = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
+    lastValueRef.current = final;
+    setDisplay(final);
+    setDragging(false);
+    onChange(final);
   };
 
   return (
@@ -238,7 +249,7 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         <Text style={[styles.sliderLabel, { color: colors.text }]}>{label}</Text>
         <View style={[styles.valueBadge, { backgroundColor: dragging ? colors.primary + '30' : colors.primary + '12' }]}>
           <Text style={[styles.valueText, { color: colors.primary }]}>
-            {formatVal(display)}
+            {display}
           </Text>
         </View>
       </View>
@@ -247,17 +258,13 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         minimumValue={min}
         maximumValue={max}
         step={step ?? 0}
-        value={dragging ? display : value}
+        value={value}
         onValueChange={(v) => {
           setDragging(true);
-          setDisplay(v);
+          const rounded = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
+          setDisplay(rounded);
         }}
-        onSlidingComplete={(v) => {
-          setDragging(false);
-          const final = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
-          setDisplay(final);
-          onChange(final);
-        }}
+        onSlidingComplete={handleComplete}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
         thumbTintColor={colors.primary}

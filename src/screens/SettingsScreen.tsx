@@ -224,32 +224,25 @@ interface SliderSettingProps {
 }
 
 const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
-  const [dragging, setDragging] = useState(false);
   const [display, setDisplay] = useState(value);
-  const lastValueRef = useRef(value);
+  const isInteger = step !== undefined && step >= 1;
 
   useEffect(() => {
-    if (!dragging && value !== lastValueRef.current) {
-      lastValueRef.current = value;
-      setDisplay(value);
-    }
-  }, [value, dragging]);
+    setDisplay(value);
+  }, [value]);
 
-  const handleComplete = (v: number) => {
-    const final = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
-    lastValueRef.current = final;
-    setDisplay(final);
-    setDragging(false);
-    onChange(final);
+  const formatVal = (v: number) => {
+    if (isInteger) return Math.round(v).toString();
+    return v.toFixed(2);
   };
 
   return (
     <View style={styles.sliderBox}>
       <View style={styles.sliderHeader}>
         <Text style={[styles.sliderLabel, { color: colors.text }]}>{label}</Text>
-        <View style={[styles.valueBadge, { backgroundColor: dragging ? colors.primary + '30' : colors.primary + '12' }]}>
+        <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12' }]}>
           <Text style={[styles.valueText, { color: colors.primary }]}>
-            {display}
+            {formatVal(display)}
           </Text>
         </View>
       </View>
@@ -259,12 +252,11 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         maximumValue={max}
         step={step ?? 0}
         value={value}
-        onValueChange={(v) => {
-          setDragging(true);
-          const rounded = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
-          setDisplay(rounded);
+        onSlidingComplete={(v) => {
+          const final = isInteger ? Math.round(v) : parseFloat(v.toFixed(2));
+          setDisplay(final);
+          onChange(final);
         }}
-        onSlidingComplete={handleComplete}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
         thumbTintColor={colors.primary}

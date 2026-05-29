@@ -1,13 +1,17 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
 import { ChatMessage } from '../types';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
 import Markdown from 'react-native-markdown-display';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   darkMode: boolean;
 }
+
+const THINK_REGEX = /<think>([\s\S]*?)<\/think>/gi;
+const THINK_REGEX_ALT = /<think>([\s\S]*?)<\/think>/gi;
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -16,6 +20,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = message.role === 'user';
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const attachments = message.attachments || [];
+  const [showThinking, setShowThinking] = useState(false);
+
+  const content = message.content || ' ';
+
+  let thinkingContent = '';
+  let responseContent = content;
+
+  const thinkMatch = content.match(THINK_REGEX);
+  if (thinkMatch && thinkMatch.length > 0) {
+    const fullThink = thinkMatch[0];
+    thinkingContent = fullThink
+      .replace(/<think>/gi, '')
+      .replace(/<\/think>/gi, '')
+      .trim();
+    responseContent = content.replace(fullThink, '').trim();
+  }
+
+  const hasThinking = thinkingContent.length > 0;
 
   return (
     <View
@@ -36,7 +58,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           },
         ]}
       >
-        {/* Image attachments */}
         {attachments.filter((a) => a.type === 'image').length > 0 && (
           <View style={styles.attachmentsRow}>
             {attachments
@@ -59,33 +80,71 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {message.content}
           </Text>
         ) : (
-          <Markdown
-            style={{
-              body: {
-                color: colors.assistantBubbleText,
-                fontSize: FONT_SIZES.md,
-              },
-              paragraph: {
-                marginBottom: 4,
-              },
-              code_inline: {
-                backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
-                color: darkMode ? '#F8FAFC' : '#0F172A',
-                borderRadius: BORDER_RADIUS.sm,
-                paddingHorizontal: 4,
-                fontFamily: 'monospace',
-              },
-              fence: {
-                backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
-                borderRadius: BORDER_RADIUS.md,
-                padding: SPACING.md,
-                color: darkMode ? '#F8FAFC' : '#0F172A',
-                fontFamily: 'monospace',
-              },
-            }}
-          >
-            {message.content || ' '}
-          </Markdown>
+          <>
+            {hasThinking && !showThinking && (
+              <TouchableOpacity
+                style={[styles.thinkingToggle, { backgroundColor: colors.primary + '15' }]}
+                onPress={() => setShowThinking(true)}
+                activeOpacity={0.7}
+              >
+                <Icon name="bulb-outline" size={14} color={colors.primary} />
+                <Text style={[styles.thinkingToggleText, { color: colors.primary }]}>
+                  Show thinking ({thinkingContent.length} chars)
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {hasThinking && showThinking && (
+              <View style={styles.thinkingSection}>
+                <TouchableOpacity
+                  style={[styles.thinkingToggle, { backgroundColor: colors.primary + '15' }]}
+                  onPress={() => setShowThinking(false)}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="bulb" size={14} color={colors.primary} />
+                  <Text style={[styles.thinkingToggleText, { color: colors.primary }]}>
+                    Hide thinking
+                  </Text>
+                </TouchableOpacity>
+                <View style={[styles.thinkingContent, { backgroundColor: colors.primary + '08' }]}>
+                  <Text style={[styles.thinkingLabel, { color: colors.primary }]}>
+                    Thoughts
+                  </Text>
+                  <Text style={[styles.thinkingText, { color: colors.textSecondary }]}>
+                    {thinkingContent}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <Markdown
+              style={{
+                body: {
+                  color: colors.assistantBubbleText,
+                  fontSize: FONT_SIZES.md,
+                },
+                paragraph: {
+                  marginBottom: 4,
+                },
+                code_inline: {
+                  backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
+                  color: darkMode ? '#F8FAFC' : '#0F172A',
+                  borderRadius: BORDER_RADIUS.sm,
+                  paddingHorizontal: 4,
+                  fontFamily: 'monospace',
+                },
+                fence: {
+                  backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
+                  borderRadius: BORDER_RADIUS.md,
+                  padding: SPACING.md,
+                  color: darkMode ? '#F8FAFC' : '#0F172A',
+                  fontFamily: 'monospace',
+                },
+              }}
+            >
+              {responseContent || ' '}
+            </Markdown>
+          </>
         )}
         {message.isStreaming && (
           <View style={styles.typingIndicator}>
@@ -147,5 +206,38 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: BORDER_RADIUS.md,
+  },
+  thinkingSection: {
+    marginBottom: SPACING.sm,
+  },
+  thinkingToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.md,
+    alignSelf: 'flex-start',
+    marginBottom: SPACING.xs,
+  },
+  thinkingToggleText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+  thinkingContent: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.xs,
+  },
+  thinkingLabel: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  thinkingText: {
+    fontSize: FONT_SIZES.sm,
+    lineHeight: 18,
   },
 });

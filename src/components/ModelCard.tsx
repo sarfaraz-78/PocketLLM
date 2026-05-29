@@ -14,6 +14,8 @@ interface ModelCardProps {
   onUnload?: () => void;
   onDownload?: () => void;
   onDelete?: () => void;
+  onRetry?: () => void;
+  onCancel?: () => void;
   darkMode: boolean;
 }
 
@@ -25,6 +27,8 @@ export const ModelCard: React.FC<ModelCardProps> = ({
   onUnload,
   onDownload,
   onDelete,
+  onRetry,
+  onCancel,
   darkMode,
 }) => {
   const colors = darkMode ? COLORS.dark : COLORS.light;
@@ -229,9 +233,39 @@ export const ModelCard: React.FC<ModelCardProps> = ({
           </>
         )}
         {model.downloadStatus === 'downloading' && (
-          <View style={[styles.downloadingBtn, { backgroundColor: colors.primary + '20' }]}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.downloadingText, { color: colors.primary }]}>Downloading</Text>
+          <View style={styles.actionRow}>
+            <View style={[styles.downloadingBtn, { backgroundColor: colors.primary + '20' }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.downloadingText, { color: colors.primary }]}>Downloading</Text>
+            </View>
+            {onCancel && (
+              <TouchableOpacity
+                style={[styles.smallActionBtn, { backgroundColor: colors.error + '12' }]}
+                onPress={onCancel}
+                activeOpacity={0.8}
+              >
+                <Icon name="close-outline" size={14} color={colors.error} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {model.downloadStatus === 'error' && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.retryBtn, { backgroundColor: colors.warning + '15' }]}
+              onPress={onRetry}
+              activeOpacity={0.85}
+            >
+              <Icon name="refresh-outline" size={14} color={colors.warning} />
+              <Text style={[styles.actionText, { color: colors.warning }]}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.smallActionBtn, { backgroundColor: colors.error + '12' }]}
+              onPress={onDelete}
+              activeOpacity={0.8}
+            >
+              <Icon name="trash-outline" size={14} color={colors.error} />
+            </TouchableOpacity>
           </View>
         )}
         {model.downloadStatus === 'not_downloaded' && (
@@ -409,5 +443,27 @@ const styles = StyleSheet.create({
   specValue: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    flex: 1,
+  },
+  retryBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  smallActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

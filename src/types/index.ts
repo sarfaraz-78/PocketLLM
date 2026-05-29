@@ -89,6 +89,14 @@ export interface CompletionSettings {
   penalty_present: number;
 }
 
+export interface TTSVoice {
+  id: string;
+  name: string;
+  gender: 'female' | 'male' | 'neutral';
+  locale?: string;
+  source: 'kokoro' | 'system';
+}
+
 export interface AppSettings {
   deviceTier: DeviceTier | null;
   tierOverride: boolean;
@@ -96,6 +104,8 @@ export interface AppSettings {
   completionSettings: CompletionSettings;
   darkMode: boolean;
   onboardingComplete: boolean;
+  enableThinking: boolean;
+  ttsVoiceId: string;
 }
 
 export interface HuggingFaceModel {

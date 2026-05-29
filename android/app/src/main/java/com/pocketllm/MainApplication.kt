@@ -21,6 +21,7 @@ class MainApplication : Application(), ReactApplication {
               // Only add custom packages that are NOT autolinked
               add(DownloadNotificationPackage())
               add(TTSPackage())
+              add(BackgroundDownloadPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

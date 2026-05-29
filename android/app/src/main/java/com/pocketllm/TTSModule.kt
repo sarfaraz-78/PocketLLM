@@ -88,6 +88,55 @@ class TTSModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         val speaking = tts?.isSpeaking ?: false
         promise.resolve(speaking)
     }
+
+    @ReactMethod
+    fun getVoices(promise: Promise) {
+        if (!isInitialized) {
+            promise.resolve(emptyList<Any>())
+            return
+        }
+        try {
+            val voices = tts?.voices
+            val voiceList = voices?.map { voice ->
+                val map = Arguments.createMap()
+                map.putString("id", voice.name)
+                map.putString("name", voice.name)
+                map.putString("locale", voice.locale?.toLanguageTag() ?: "")
+                // Gender API requires Android 7.1+; default to neutral for compatibility
+                val gender = try {
+                    val genderField = android.speech.tts.Voice::class.java.getField("GENDER_FEMALE")
+                    val genderValue = voice.javaClass.getMethod("getGender").invoke(voice) as Int
+                    when (genderValue) {
+                        genderField.getInt(null) -> "female"
+                        android.speech.tts.Voice::class.java.getField("GENDER_MALE").getInt(null) -> "male"
+                        else -> "neutral"
+                    }
+                } catch (e: Exception) {
+                    "neutral"
+                }
+                map.putString("gender", gender)
+                map.putBoolean("isNetworkRequired", voice.isNetworkConnectionRequired)
+                map
+            } ?: emptyList()
+            promise.resolve(voiceList)
+        } catch (e: Exception) {
+            promise.reject("TTS_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setVoice(voiceId: String) {
+        if (!isInitialized) return
+        try {
+            val voices = tts?.voices
+            val targetVoice = voices?.find { it.name == voiceId }
+            if (targetVoice != null) {
+                tts?.voice = targetVoice
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
     
     override fun onCatalystInstanceDestroy() {
         tts?.shutdown()

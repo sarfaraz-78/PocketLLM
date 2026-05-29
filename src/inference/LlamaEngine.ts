@@ -149,7 +149,8 @@ async loadModel(modelPath: string, tier: DeviceTier, mmprojPath?: string): Promi
     messages: Array<{ role: string; content: string | RNLlamaMessagePart[] }>,
     settings: CompletionSettings,
     onToken: (token: string) => void,
-    attachments?: AttachmentItem[]
+    attachments?: AttachmentItem[],
+    enableThinking?: boolean
   ): Promise<{ text: string; stats: GenerationStats }> {
     if (!this.context) {
       throw new Error('Model not loaded');
@@ -201,6 +202,7 @@ async loadModel(modelPath: string, tier: DeviceTier, mmprojPath?: string): Promi
         penalty_freq: settings.penalty_freq,
         penalty_present: settings.penalty_present,
         stop: STOP_WORDS,
+        enable_thinking: enableThinking ?? true,
       };
 
       // Check multimodal support

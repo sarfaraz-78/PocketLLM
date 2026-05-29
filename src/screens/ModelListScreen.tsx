@@ -75,7 +75,7 @@ export const ModelListScreen: React.FC = () => {
   const [pendingModel, setPendingModel] = useState<ModelInfo | null>(null);
 
   const { deviceTier, darkMode } = useSettingsStore();
-  const { downloadedModels, activeModel, setActiveModel, addDownloadedModel, removeDownloadedModel, updateModelProgress, loadingModelId, setLoadingModelId } =
+  const { downloadedModels, activeModel, setActiveModel, addDownloadedModel, removeDownloadedModel, updateModelProgress, setModelStatus, loadingModelId, setLoadingModelId } =
     useModelStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
 
@@ -89,7 +89,44 @@ export const ModelListScreen: React.FC = () => {
 
   useEffect(() => {
     loadLocalModels();
+
+    // Listen for background download status changes
+    const unsubscribe = ModelFileManager.onDownloadStatusChange((tasks) => {
+      for (const task of tasks) {
+        if (task.status === 'downloading' || task.status === 'pending' || task.status === 'paused') {
+          updateModelProgress(task.modelId, task.progress);
+        } else if (task.status === 'completed') {
+          handleDownloadComplete(task.modelId, task.localPath || '');
+        } else if (task.status === 'failed') {
+          setModelStatus(task.modelId, 'error');
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
+
+  const handleDownloadComplete = async (modelId: string, localPath: string) => {
+    const model = downloadedModels.find((m) => m.id === modelId);
+    if (!model) return;
+
+    let specs: ModelInfo['specs'] = undefined;
+    try {
+      specs = await extractModelSpecs(localPath);
+    } catch (e) {
+      console.warn('[Download] Could not extract specs:', e);
+    }
+
+    addDownloadedModel({
+      ...model,
+      localPath,
+      downloadStatus: 'downloaded',
+      downloadProgress: 100,
+      specs,
+    });
+  };
 
   const loadLocalModels = async () => {
     try {
@@ -253,7 +290,7 @@ export const ModelListScreen: React.FC = () => {
   const doDownload = async (model: ModelInfo) => {
     Alert.alert(
       'Download Model',
-      `Download ${model.name} (${(model.sizeMB / 1024).toFixed(1)} GB)?`,
+      `Download ${model.name} (${(model.sizeMB / 1024).toFixed(1)} GB)?\n\nThis will download in the background. You can close the app and the download will continue.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -270,31 +307,16 @@ export const ModelListScreen: React.FC = () => {
             addDownloadedModel(downloadingModel);
 
             try {
-              const localPath = await ModelFileManager.downloadModel(
+              // Start background download - returns immediately, continues in background
+              await ModelFileManager.downloadModel(
                 model,
                 (progress) => {
                   updateModelProgress(model.id, progress);
                 }
               );
 
-              // Read actual GGUF specs after download
-              let specs: ModelInfo['specs'] = undefined;
-              try {
-                specs = await extractModelSpecs(localPath);
-                console.log('[Download] Extracted specs:', specs);
-              } catch (specErr) {
-                console.warn('[Download] Could not extract specs:', specErr);
-              }
-
-              const downloadedModel = {
-                ...model,
-                localPath,
-                downloadStatus: 'downloaded' as const,
-                downloadProgress: 100,
-                specs,
-              };
-              addDownloadedModel(downloadedModel);
-              Alert.alert('Success', 'Model downloaded successfully!');
+              // Download started - it will continue in background
+              // Completion is handled by the status change listener
             } catch (error) {
               addDownloadedModel({
                 ...model,
@@ -390,6 +412,37 @@ export const ModelListScreen: React.FC = () => {
     );
   };
 
+  const handleRetry = async (model: ModelInfo) => {
+    addDownloadedModel({
+      ...model,
+      downloadStatus: 'downloading',
+      downloadProgress: 0,
+    });
+    try {
+      await ModelFileManager.retryDownload(model.id, (progress) => {
+        updateModelProgress(model.id, progress);
+      });
+    } catch (error) {
+      addDownloadedModel({
+        ...model,
+        downloadStatus: 'error',
+      });
+      Alert.alert(
+        'Retry Failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  };
+
+  const handleCancel = async (model: ModelInfo) => {
+    try {
+      await ModelFileManager.cancelDownload(model.id);
+      removeDownloadedModel(model.id);
+    } catch (error) {
+      console.error('Cancel error:', error);
+    }
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -473,6 +526,8 @@ export const ModelListScreen: React.FC = () => {
                   onLoad={() => handleLoad(model)}
                   onUnload={handleUnload}
                   onDelete={() => handleDelete(model)}
+                  onRetry={() => handleRetry(model)}
+                  onCancel={() => handleCancel(model)}
                   darkMode={darkMode}
                 />
               ))}
@@ -510,6 +565,8 @@ export const ModelListScreen: React.FC = () => {
                 onLoad={() => handleLoad(model)}
                 onUnload={handleUnload}
                 onDelete={() => handleDelete(model)}
+                onRetry={() => handleRetry(model)}
+                onCancel={() => handleCancel(model)}
                 darkMode={darkMode}
               />
             ))}
@@ -532,6 +589,8 @@ export const ModelListScreen: React.FC = () => {
               onLoad={() => handleLoad(model)}
               onUnload={handleUnload}
               onDelete={() => handleDelete(model)}
+              onRetry={() => handleRetry(model)}
+              onCancel={() => handleCancel(model)}
               darkMode={darkMode}
             />
           ))}

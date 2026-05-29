@@ -24,10 +24,12 @@ export const SettingsScreen: React.FC = () => {
     systemPrompt,
     completionSettings,
     darkMode,
+    enableThinking,
     setTierOverride,
     setSystemPrompt,
     setCompletionSettings,
     setDarkMode,
+    setEnableThinking,
     resetToDefaults,
   } = useSettingsStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
@@ -100,6 +102,14 @@ export const SettingsScreen: React.FC = () => {
           <Switch
             value={darkMode}
             onValueChange={setDarkMode}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </SettingRow>
+        <SettingRow icon="brain-outline" label="Enable Thinking">
+          <Switch
+            value={enableThinking}
+            onValueChange={setEnableThinking}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFFFFF"
           />
@@ -186,6 +196,17 @@ export const SettingsScreen: React.FC = () => {
         <Icon name="refresh-outline" size={18} color={colors.error} />
         <Text style={[styles.resetText, { color: colors.error }]}>Reset to Defaults</Text>
       </TouchableOpacity>
+
+      {/* Made in India */}
+      <View style={styles.madeIn}>
+        <Text style={[styles.madeInText, { color: colors.textSecondary }]}>
+          Made with
+        </Text>
+        <Icon name="heart" size={14} color="#E11D48" />
+        <Text style={[styles.madeInText, { color: colors.textSecondary }]}>
+          in India
+        </Text>
+      </View>
     </ScrollView>
   );
 };
@@ -201,7 +222,15 @@ interface SliderSettingProps {
 }
 
 const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
-  const [displayValue, setDisplayValue] = useState(step ? value : value.toFixed(2));
+  // Local state for smooth dragging without store re-render fights
+  const [sliderValue, setSliderValue] = useState(value);
+  const [displayValue, setDisplayValue] = useState(step ? value.toString() : value.toFixed(2));
+
+  // Sync with external value changes (e.g. reset)
+  React.useEffect(() => {
+    setSliderValue(value);
+    setDisplayValue(step ? value.toString() : value.toFixed(2));
+  }, [value, step]);
 
   return (
     <View style={styles.sliderBox}>
@@ -218,15 +247,15 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         minimumValue={min}
         maximumValue={max}
         step={step ?? 0.01}
-        value={value}
+        value={sliderValue}
+        onValueChange={(v) => {
+          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
+          setSliderValue(rounded);
+          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
+        }}
         onSlidingComplete={(v) => {
           const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
           onChange(rounded);
-          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
-        }}
-        onValueChange={(v) => {
-          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
-          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
         }}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
@@ -337,5 +366,16 @@ const styles = StyleSheet.create({
   resetText: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+  },
+  madeIn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.xxl,
+  },
+  madeInText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '500',
   },
 });

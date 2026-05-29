@@ -17,7 +17,9 @@ import { useModelStore } from '../store/useModelStore';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { llamaEngine } from '../inference/LlamaEngine';
 import { simpleTTS } from '../services/SimpleTTS';
+import { getVoiceById } from '../services/VoiceManager';
 import { AttachmentItem } from '../components/ChatInput';
+import { VoicePicker } from '../components/VoicePicker';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatInput } from '../components/ChatInput';
 import { ModelStatusBar } from '../components/ModelStatusBar';
@@ -36,13 +38,17 @@ export const ChatScreen: React.FC = () => {
     clearMessages,
   } = useChatStore();
   const { activeModel } = useModelStore();
-  const { systemPrompt, completionSettings, darkMode } = useSettingsStore();
+  const { systemPrompt, completionSettings, darkMode, enableThinking, setEnableThinking, ttsVoiceId, setTTSVoiceId } = useSettingsStore();
   const { saveCurrentConversation } = useHistoryStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voicePickerVisible, setVoicePickerVisible] = useState(false);
 
-  // TTS is available when a model is loaded
-  const showTTS = llamaEngine.isLoaded();
+  const selectedVoice = getVoiceById(ttsVoiceId);
+
+  // TTS is available when a model is loaded and there's an assistant message
+  const hasAssistantMessage = messages.some((m) => m.role === 'assistant' && !m.isStreaming && m.content);
+  const showTTS = llamaEngine.isLoaded() && hasAssistantMessage;
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -70,10 +76,9 @@ export const ChatScreen: React.FC = () => {
 
     if (lastAssistant?.content) {
       setIsSpeaking(true);
+      simpleTTS.setVoice(ttsVoiceId);
       await simpleTTS.speak(lastAssistant.content);
       setIsSpeaking(false);
-    } else {
-      Alert.alert('No Message', 'Generate a response first to use TTS.');
     }
   };
 
@@ -143,7 +148,8 @@ export const ChatScreen: React.FC = () => {
           streamingText += token;
           updateLastAssistantMessage(streamingText, true);
         },
-        imageAttachments
+        imageAttachments,
+        enableThinking
       );
 
       updateLastAssistantMessage(text, false, stats);
@@ -183,22 +189,11 @@ export const ChatScreen: React.FC = () => {
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-        <View style={styles.headerActions}>
-          {showTTS && (
-            <TouchableOpacity onPress={handleSpeak} style={styles.headerBtn}>
-              <Icon
-                name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
-                size={20}
-                color={isSpeaking ? colors.primary : colors.textTertiary}
-              />
-            </TouchableOpacity>
-          )}
-          {messages.length > 0 && (
-            <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
-              <Icon name="trash-outline" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
-        </View>
+        {messages.length > 0 && (
+          <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
+            <Icon name="trash-outline" size={20} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
       </View>
       <ModelStatusBar
         activeModel={activeModel}
@@ -229,6 +224,72 @@ export const ChatScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* Bottom action bar: Thinking toggle + TTS */}
+      <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <TouchableOpacity
+          style={[
+            styles.actionBtn,
+            { backgroundColor: enableThinking ? colors.primary + '18' : colors.surfaceVariant },
+          ]}
+          onPress={() => setEnableThinking(!enableThinking)}
+          activeOpacity={0.8}
+        >
+          <Icon
+            name={enableThinking ? 'brain' : 'brain-outline'}
+            size={16}
+            color={enableThinking ? colors.primary : colors.textSecondary}
+          />
+          <Text style={[styles.actionText, { color: enableThinking ? colors.primary : colors.textSecondary }]}>
+            Thinking
+          </Text>
+        </TouchableOpacity>
+
+        {showTTS && (
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              { backgroundColor: isSpeaking ? colors.primary + '18' : colors.surfaceVariant },
+            ]}
+            onPress={handleSpeak}
+            activeOpacity={0.8}
+          >
+            <Icon
+              name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
+              size={16}
+              color={isSpeaking ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.actionText, { color: isSpeaking ? colors.primary : colors.textSecondary }]}>
+              {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {showTTS && (
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              { backgroundColor: colors.surfaceVariant },
+            ]}
+            onPress={() => setVoicePickerVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Icon name="mic-outline" size={16} color={colors.textSecondary} />
+            <Text style={[styles.actionText, { color: colors.textSecondary }]}>
+              {selectedVoice?.name || 'Voice'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <VoicePicker
+        visible={voicePickerVisible}
+        selectedVoiceId={ttsVoiceId}
+        onSelect={setTTSVoiceId}
+        onClose={() => setVoicePickerVisible(false)}
+        darkMode={darkMode}
+      />
+
       <ChatInput
         onSend={handleSend}
         onStop={handleStop}
@@ -255,11 +316,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
   },
   headerBtn: {
     padding: SPACING.sm,
@@ -290,5 +346,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderTopWidth: 1,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 20,
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

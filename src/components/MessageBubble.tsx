@@ -180,6 +180,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     maxWidth: Dimensions.get('window').width * 0.85,
+    flexShrink: 0,
   },
   text: {
     fontSize: FONT_SIZES.md,

@@ -15,15 +15,15 @@ export const TierBadge: React.FC<TierBadgeProps> = ({
   const getTierColor = () => {
     switch (tier) {
       case DeviceTier.ULTRA_LOW:
-        return COLORS.light.error;
+        return '#EF4444';
       case DeviceTier.LOW:
-        return COLORS.light.warning;
+        return '#F59E0B';
       case DeviceTier.MEDIUM:
-        return COLORS.light.info;
+        return '#0D9488';
       case DeviceTier.HIGH:
-        return COLORS.light.success;
+        return '#10B981';
       case DeviceTier.PREMIUM:
-        return COLORS.light.primary;
+        return '#06B6D4';
     }
   };
 
@@ -44,28 +44,30 @@ export const TierBadge: React.FC<TierBadgeProps> = ({
 
   const sizeStyles = {
     small: {
-      container: { paddingHorizontal: SPACING.xs, paddingVertical: 2 },
+      container: { paddingHorizontal: 8, paddingVertical: 3 },
       text: { fontSize: FONT_SIZES.xs },
     },
     medium: {
-      container: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs },
+      container: { paddingHorizontal: SPACING.md, paddingVertical: 5 },
       text: { fontSize: FONT_SIZES.sm },
     },
     large: {
-      container: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+      container: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm },
       text: { fontSize: FONT_SIZES.md },
     },
   };
+
+  const color = getTierColor();
 
   return (
     <View
       style={[
         styles.container,
         sizeStyles[size].container,
-        { backgroundColor: getTierColor() },
+        { backgroundColor: color + '14' },
       ]}
     >
-      <Text style={[styles.text, sizeStyles[size].text]}>
+      <Text style={[styles.text, sizeStyles[size].text, { color }]}>
         {getTierLabel()}
       </Text>
     </View>
@@ -74,11 +76,10 @@ export const TierBadge: React.FC<TierBadgeProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: BORDER_RADIUS.md,
     alignSelf: 'flex-start',
   },
   text: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

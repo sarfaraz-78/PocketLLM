@@ -17,7 +17,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   tierOverride: false,
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   completionSettings: DEFAULT_COMPLETION_SETTINGS,
-  darkMode: false,
+  darkMode: true,
   onboardingComplete: false,
 
   setDeviceTier: (tier) => set({ deviceTier: tier }),
@@ -34,5 +34,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       completionSettings: DEFAULT_COMPLETION_SETTINGS,
       tierOverride: false,
+      darkMode: true,
     }),
 }));

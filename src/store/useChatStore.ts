@@ -7,10 +7,11 @@ interface ChatState {
   currentStreamingText: string;
   lastStats: GenerationStats | null;
   addMessage: (message: ChatMessage) => void;
-  updateLastAssistantMessage: (content: string, isStreaming: boolean) => void;
+  updateLastAssistantMessage: (content: string, isStreaming: boolean, timings?: GenerationStats) => void;
   setGenerating: (generating: boolean) => void;
   setCurrentStreamingText: (text: string) => void;
   setLastStats: (stats: GenerationStats) => void;
+  setMessages: (messages: ChatMessage[]) => void;
   clearMessages: () => void;
 }
 
@@ -25,7 +26,7 @@ export const useChatStore = create<ChatState>((set) => ({
       messages: [...state.messages, message],
     })),
 
-  updateLastAssistantMessage: (content, isStreaming) =>
+  updateLastAssistantMessage: (content, isStreaming, timings) =>
     set((state) => {
       const messages = [...state.messages];
       const lastIndex = messages.length - 1;
@@ -34,6 +35,13 @@ export const useChatStore = create<ChatState>((set) => ({
           ...messages[lastIndex],
           content,
           isStreaming,
+          timings: timings ? {
+            tokensPerSecond: timings.tokensPerSecond,
+            totalTokens: timings.totalTokens,
+            promptTokens: timings.promptTokens,
+            promptPerSecond: timings.promptPerSecond,
+            totalTimeMs: timings.totalTimeMs,
+          } : messages[lastIndex].timings,
         };
       }
       return { messages };
@@ -42,5 +50,6 @@ export const useChatStore = create<ChatState>((set) => ({
   setGenerating: (generating) => set({ isGenerating: generating }),
   setCurrentStreamingText: (text) => set({ currentStreamingText: text }),
   setLastStats: (stats) => set({ lastStats: stats }),
+  setMessages: (messages) => set({ messages }),
   clearMessages: () => set({ messages: [], lastStats: null }),
 }));

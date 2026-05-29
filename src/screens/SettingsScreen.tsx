@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
+  StatusBar,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -49,15 +50,36 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const SettingRow: React.FC<{
+    icon: string;
+    label: string;
+    children: React.ReactNode;
+  }> = ({ icon, label, children }) => (
+    <View style={styles.settingRow}>
+      <View style={styles.settingLeft}>
+        <View style={[styles.settingIcon, { backgroundColor: colors.primary + '10' }]}>
+          <Icon name={icon} size={18} color={colors.primary} />
+        </View>
+        <Text style={[styles.settingLabel, { color: colors.text }]}>{label}</Text>
+      </View>
+      {children}
+    </View>
+  );
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
     >
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
+
+      <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
+
       {deviceTier && (
-        <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.md]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>
-            Device Tier
+        <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>
+            Device
           </Text>
           <View style={styles.tierRow}>
             <TierBadge tier={deviceTier} size="large" />
@@ -70,28 +92,22 @@ export const SettingsScreen: React.FC = () => {
         </View>
       )}
 
-      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.md]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>
+      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>
           Appearance
         </Text>
-        <View style={styles.settingRow}>
-          <View style={styles.settingInfo}>
-            <Icon name="moon-outline" size={24} color={colors.primary} />
-            <Text style={[styles.settingLabel, { color: colors.text }]}>
-              Dark Mode
-            </Text>
-          </View>
+        <SettingRow icon="moon-outline" label="Dark Mode">
           <Switch
             value={darkMode}
             onValueChange={setDarkMode}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFFFFF"
           />
-        </View>
+        </SettingRow>
       </View>
 
-      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.md]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>
+      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>
           System Prompt
         </Text>
         <TextInput
@@ -106,109 +122,117 @@ export const SettingsScreen: React.FC = () => {
           value={systemPrompt}
           onChangeText={setSystemPrompt}
           multiline
-          numberOfLines={4}
-          placeholder="Enter system prompt..."
+          numberOfLines={5}
+          placeholder="You are a helpful assistant..."
           placeholderTextColor={colors.textTertiary}
+          textAlignVertical="top"
         />
       </View>
 
-      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.md]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>
+      <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>
           Generation Settings
         </Text>
 
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderLabel, { color: colors.text }]}>
-            Temperature: {completionSettings.temperature.toFixed(2)}
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={2}
-            value={completionSettings.temperature}
-            onValueChange={(value) =>
-              setCompletionSettings({ temperature: value })
-            }
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-          />
-        </View>
-
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderLabel, { color: colors.text }]}>
-            Top P: {completionSettings.top_p.toFixed(2)}
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={1}
-            value={completionSettings.top_p}
-            onValueChange={(value) => setCompletionSettings({ top_p: value })}
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-          />
-        </View>
-
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderLabel, { color: colors.text }]}>
-            Top K: {completionSettings.top_k}
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={1}
-            maximumValue={100}
-            step={1}
-            value={completionSettings.top_k}
-            onValueChange={(value) => setCompletionSettings({ top_k: value })}
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-          />
-        </View>
-
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderLabel, { color: colors.text }]}>
-            Max Tokens: {completionSettings.n_predict}
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={64}
-            maximumValue={2048}
-            step={64}
-            value={completionSettings.n_predict}
-            onValueChange={(value) =>
-              setCompletionSettings({ n_predict: value })
-            }
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-          />
-        </View>
-
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderLabel, { color: colors.text }]}>
-            Repeat Penalty: {completionSettings.penalty_repeat.toFixed(2)}
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={1}
-            maximumValue={2}
-            value={completionSettings.penalty_repeat}
-            onValueChange={(value) =>
-              setCompletionSettings({ penalty_repeat: value })
-            }
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-          />
-        </View>
+        <SliderSetting
+          label="Temperature"
+          value={completionSettings.temperature}
+          min={0}
+          max={2}
+          onChange={(v) => setCompletionSettings({ temperature: v })}
+          colors={colors}
+        />
+        <SliderSetting
+          label="Top P"
+          value={completionSettings.top_p}
+          min={0}
+          max={1}
+          onChange={(v) => setCompletionSettings({ top_p: v })}
+          colors={colors}
+        />
+        <SliderSetting
+          label="Top K"
+          value={completionSettings.top_k}
+          min={1}
+          max={100}
+          step={1}
+          onChange={(v) => setCompletionSettings({ top_k: v })}
+          colors={colors}
+        />
+        <SliderSetting
+          label="Max Tokens"
+          value={completionSettings.n_predict}
+          min={64}
+          max={4096}
+          step={64}
+          onChange={(v) => setCompletionSettings({ n_predict: v })}
+          colors={colors}
+        />
+        <SliderSetting
+          label="Repeat Penalty"
+          value={completionSettings.penalty_repeat}
+          min={1}
+          max={2}
+          onChange={(v) => setCompletionSettings({ penalty_repeat: v })}
+          colors={colors}
+        />
       </View>
 
       <TouchableOpacity
-        style={[styles.resetButton, { backgroundColor: colors.error }]}
+        style={[styles.resetButton, { backgroundColor: colors.error + '10' }]}
         onPress={handleReset}
+        activeOpacity={0.8}
       >
-        <Icon name="refresh-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.resetButtonText}>Reset to Defaults</Text>
+        <Icon name="refresh-outline" size={18} color={colors.error} />
+        <Text style={[styles.resetText, { color: colors.error }]}>Reset to Defaults</Text>
       </TouchableOpacity>
     </ScrollView>
+  );
+};
+
+interface SliderSettingProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  colors: any;
+}
+
+const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
+  const [displayValue, setDisplayValue] = useState(step ? value : value.toFixed(2));
+
+  return (
+    <View style={styles.sliderBox}>
+      <View style={styles.sliderHeader}>
+        <Text style={[styles.sliderLabel, { color: colors.text }]}>{label}</Text>
+        <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12' }]}>
+          <Text style={[styles.valueText, { color: colors.primary }]}>
+            {displayValue}
+          </Text>
+        </View>
+      </View>
+      <Slider
+        style={styles.slider}
+        minimumValue={min}
+        maximumValue={max}
+        step={step ?? 0.01}
+        value={value}
+        onSlidingComplete={(v) => {
+          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
+          onChange(rounded);
+          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
+        }}
+        onValueChange={(v) => {
+          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
+          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
+        }}
+        minimumTrackTintColor={colors.primary}
+        maximumTrackTintColor={colors.border}
+        thumbTintColor={colors.primary}
+      />
+    </View>
   );
 };
 
@@ -217,26 +241,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: SPACING.md,
-    paddingBottom: SPACING.xxl,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.huge,
+  },
+  pageTitle: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '800',
+    marginBottom: SPACING.lg,
   },
   card: {
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   cardTitle: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.sm,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
     marginBottom: SPACING.md,
   },
   tierRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.sm,
   },
   overrideText: {
     fontSize: FONT_SIZES.sm,
-    marginLeft: SPACING.sm,
     fontWeight: '600',
   },
   settingRow: {
@@ -244,47 +275,67 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  settingInfo: {
+  settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    gap: SPACING.md,
+  },
+  settingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   settingLabel: {
     fontSize: FONT_SIZES.md,
-    marginLeft: SPACING.md,
+    fontWeight: '500',
   },
   textInput: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
     fontSize: FONT_SIZES.md,
-    minHeight: 100,
-    textAlignVertical: 'top',
+    minHeight: 120,
+    lineHeight: 22,
   },
-  sliderContainer: {
+  sliderBox: {
     marginBottom: SPACING.md,
   },
-  sliderLabel: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '500',
+  sliderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: SPACING.xs,
+  },
+  sliderLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '500',
+  },
+  valueBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  valueText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
   },
   slider: {
     width: '100%',
-    height: 40,
+    height: 32,
   },
   resetButton: {
     flexDirection: 'row',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: SPACING.lg,
+    gap: SPACING.sm,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl,
+    marginTop: SPACING.md,
   },
-  resetButtonText: {
-    color: '#FFFFFF',
+  resetText: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    marginLeft: SPACING.sm,
   },
 });

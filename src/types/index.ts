@@ -25,7 +25,12 @@ export interface ChatMessage {
     tokensPerSecond: number;
     totalTokens: number;
     promptTokens: number;
+    promptPerSecond?: number;
+    totalTimeMs?: number;
   };
+  attachments?: Array<{ uri: string; type: 'image' | 'audio'; name?: string; duration?: number }>;
+  ttsAudioUri?: string;
+  ttsDuration?: number;
 }
 
 export interface ModelInfo {
@@ -42,6 +47,20 @@ export interface ModelInfo {
   localPath?: string;
   downloadStatus: 'not_downloaded' | 'downloading' | 'downloaded' | 'error';
   downloadProgress?: number;
+  availableQuants?: Array<{ fileName: string; sizeMB: number; quantLabel: string }>;
+  specs?: {
+    vocabSize?: number;
+    contextSize?: number;
+    embeddingLength?: number;
+    layerCount?: number;
+    feedForwardLength?: number;
+    headCount?: number;
+    kvHeadCount?: number;
+    maxTokens?: number;
+    quantizationVersion?: string;
+  };
+  mmprojPath?: string;
+  isMultimodal?: boolean;
 }
 
 export interface InferencePreset {

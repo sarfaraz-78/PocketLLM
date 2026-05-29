@@ -1,11 +1,13 @@
+import com.facebook.react.ReactRootProjectPlugin
+
 buildscript {
     ext {
         buildToolsVersion = "35.0.0"
         minSdkVersion = 24
         compileSdkVersion = 35
         targetSdkVersion = 35
-        ndkVersion = "27.1.12297006"
-        kotlinVersion = "2.0.21"
+        ndkVersion = "27.0.12077973"
+        kotlinVersion = "2.1.21"
     }
     repositories {
         google()
@@ -13,14 +15,22 @@ buildscript {
     }
     dependencies {
         classpath("com.android.tools.build:gradle:8.8.2")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.1.21")
+        classpath(files(
+            "${rootDir}/../node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build/libs/react-native-gradle-plugin.jar",
+            "${rootDir}/../node_modules/@react-native/gradle-plugin/shared/build/libs/shared.jar"
+        ))
     }
 }
 
 allprojects {
     repositories {
-        maven { url = uri("https://jitpack.io") }
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
+
+
+
+apply plugin: ReactRootProjectPlugin

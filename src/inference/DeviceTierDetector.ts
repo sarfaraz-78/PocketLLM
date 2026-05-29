@@ -1,12 +1,24 @@
-import DeviceInfo from 'react-native-device-info';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { DeviceProfile, DeviceTier } from '../types';
 
 export class DeviceTierDetector {
   static async detect(): Promise<DeviceProfile> {
-    const ramBytes = await DeviceInfo.getTotalMemory();
-    const ramGB = ramBytes / (1024 * 1024 * 1024);
-    const cpuCores = await DeviceInfo.getSupportedAbis();
+    let ramGB = 4;
+    let cpuCores = 4;
+
+    try {
+      // Try to get memory info from native module if available
+      const { PlatformConstants } = NativeModules;
+      if (PlatformConstants?.getConstants) {
+        const constants = await PlatformConstants.getConstants();
+        if (constants?.TotalMemory) {
+          ramGB = constants.TotalMemory / (1024 * 1024 * 1024);
+        }
+      }
+    } catch {
+      // Fallback to estimate
+    }
+
     const platform = Platform.OS as 'ios' | 'android';
 
     let gpuAvailable = false;
@@ -25,7 +37,7 @@ export class DeviceTierDetector {
     return {
       tier,
       ramGB: Math.round(ramGB * 10) / 10,
-      cpuCores: cpuCores.length,
+      cpuCores,
       platform,
       gpuAvailable,
       gpuName,

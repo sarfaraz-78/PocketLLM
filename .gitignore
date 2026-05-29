@@ -66,6 +66,16 @@ yarn-error.log
 # testing
 /coverage
 
+# Android specific
+*.apk
+*.aab
+android/app/build/
+android/build/
+android/.gradle/
+android/hs_err_pid*.log
+android/replay_pid*.log
+android/app/src/main/assets/index.android.bundle
+
 # Yarn
 .yarn/*
 !.yarn/patches

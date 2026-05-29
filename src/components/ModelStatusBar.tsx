@@ -19,8 +19,8 @@ export const ModelStatusBar: React.FC<ModelStatusBarProps> = ({
 
   if (!activeModel) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface }]}>
-        <Icon name="alert-circle-outline" size={20} color={colors.warning} />
+      <View style={[styles.container, { backgroundColor: colors.surfaceVariant }]}>
+        <View style={[styles.dot, { backgroundColor: colors.warning }]} />
         <Text style={[styles.text, { color: colors.textSecondary }]}>
           No model loaded
         </Text>
@@ -29,21 +29,27 @@ export const ModelStatusBar: React.FC<ModelStatusBarProps> = ({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: colors.surfaceVariant }]}>
       <View style={styles.leftSection}>
-        <Icon name="cube-outline" size={20} color={colors.primary} />
+        <View style={[styles.dot, { backgroundColor: colors.success }]} />
         <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
           {activeModel.name}
         </Text>
       </View>
       {lastStats && (
         <View style={styles.rightSection}>
-          <Text style={[styles.stat, { color: colors.textSecondary }]}>
-            {lastStats.tokensPerSecond.toFixed(1)} tok/s
-          </Text>
-          <Text style={[styles.stat, { color: colors.textSecondary }]}>
-            {lastStats.totalTokens} tokens
-          </Text>
+          <View style={styles.statPill}>
+            <Icon name="flash-outline" size={12} color={colors.textTertiary} />
+            <Text style={[styles.stat, { color: colors.textSecondary }]}>
+              {lastStats.tokensPerSecond.toFixed(1)} tok/s
+            </Text>
+          </View>
+          <View style={styles.statPill}>
+            <Icon name="time-outline" size={12} color={colors.textTertiary} />
+            <Text style={[styles.stat, { color: colors.textSecondary }]}>
+              {(lastStats.totalTimeMs / 1000).toFixed(1)}s
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -57,30 +63,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.light.border,
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: BORDER_RADIUS.full,
+    marginRight: SPACING.sm,
+  },
   modelName: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
-    marginLeft: SPACING.sm,
     flex: 1,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  statPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   stat: {
     fontSize: FONT_SIZES.xs,
-    marginLeft: SPACING.md,
+    fontWeight: '500',
   },
   text: {
     fontSize: FONT_SIZES.sm,
-    marginLeft: SPACING.sm,
+    fontWeight: '500',
   },
 });

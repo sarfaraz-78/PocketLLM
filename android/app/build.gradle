@@ -1,17 +1,23 @@
 apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: com.facebook.react.ReactPlugin
 
-def enableHermes = project.hasProperty('hermesEnabled') ? project.getProperty('hermesEnabled') : false
+react {
+    autolinkLibrariesWithApp()
+}
+
+def enableProguardInReleaseBuilds = false
 
 android {
-    ndkVersion "27.1.12297006"
-    buildToolsVersion "35.0.0"
-    compileSdk 35
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.pocketllm"
     defaultConfig {
         applicationId "com.pocketllm"
-        minSdkVersion 24
-        targetSdkVersion 35
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
     }
@@ -29,19 +35,29 @@ android {
         }
         release {
             signingConfig signingConfigs.debug
-            minifyEnabled false
+            minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
-}
-
-repositories {
-    google()
-    mavenCentral()
-    maven { url = uri("https://jitpack.io") }
+    packagingOptions {
+        pickFirst "**/libc++_shared.so"
+    }
 }
 
 dependencies {
-    implementation("com.facebook.react:react-android:0.79.2")
-    implementation("com.facebook.fbjni:fbjni:0.7.0")
+    implementation("com.facebook.react:react-android")
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation "org.webkit:android-jsc:+"
+    }
+    implementation project(':react-native-screens')
+    implementation project(':react-native-gesture-handler')
+    implementation project(':react-native-safe-area-context')
+    implementation project(':llama.rn')
+    implementation project(':react-native-fs')
+    implementation project(':react-native-community_slider')
+    implementation project(':react-native-vector-icons')
+    implementation project(':react-native-device-info')
+    implementation project(':react-native-async-storage_async-storage')
 }

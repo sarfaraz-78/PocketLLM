@@ -1,6 +1,8 @@
 import RNFS from 'react-native-fs';
 import { Platform } from 'react-native';
 import { ModelInfo } from '../types';
+import { DownloadNotificationService } from './DownloadNotification';
+import { extractParams } from '../utils/paramUtils';
 
 export class ModelFileManager {
   static async getModelDirectory(): Promise<string> {
@@ -23,19 +25,22 @@ export class ModelFileManager {
 
     return files
       .filter((file) => file.name.endsWith('.gguf') && file.isFile())
-      .map((file) => ({
-        id: file.name,
-        name: file.name.replace('.gguf', ''),
-        repoId: 'local',
-        fileName: file.name,
-        downloadUrl: '',
-        sizeMB: Math.round((file.size || 0) / (1024 * 1024)),
-        quantization: 'Unknown',
-        params: 'Unknown',
-        tier: 'MEDIUM' as any,
-        localPath: file.path,
-        downloadStatus: 'downloaded' as const,
-      }));
+      .map((file) => {
+        const quantMatch = file.name.match(/(UD-[A-Z0-9]+(?:_[A-Z0-9]+)*|IQ\d+(?:_[A-Z0-9]+)*|Q\d+(?:_[A-Z0-9]+)*|FP16|BF16|F16|F32)/i);
+        return {
+          id: file.name,
+          name: file.name.replace('.gguf', ''),
+          repoId: 'local',
+          fileName: file.name,
+          downloadUrl: '',
+          sizeMB: Math.round((file.size || 0) / (1024 * 1024)),
+          quantization: quantMatch ? quantMatch[1].toUpperCase() : 'unknown',
+          params: extractParams(file.name),
+          tier: 'MEDIUM' as any,
+          localPath: file.path,
+          downloadStatus: 'downloaded' as const,
+        };
+      });
   }
 
   static async downloadModel(
@@ -49,23 +54,35 @@ export class ModelFileManager {
       return destinationPath;
     }
 
-    const downloadResult = RNFS.downloadFile({
-      fromUrl: model.downloadUrl,
-      toFile: destinationPath,
-      progress: (res) => {
-        const progress =
-          (res.bytesWritten / res.contentLength) * 100;
-        onProgress(progress);
-      },
-      progressDivider: 1,
-    });
+    DownloadNotificationService.show(`Downloading ${model.name}`);
 
-    const result = await downloadResult.promise;
+    try {
+      const downloadResult = RNFS.downloadFile({
+        fromUrl: model.downloadUrl,
+        toFile: destinationPath,
+        begin: () => {
+          DownloadNotificationService.show(`Downloading ${model.name}`);
+        },
+        progress: (res) => {
+          const progress =
+            (res.bytesWritten / res.contentLength) * 100;
+          onProgress(progress);
+          DownloadNotificationService.updateProgress(progress);
+        },
+        progressDivider: 1,
+      });
 
-    if (result.statusCode === 200) {
-      return destinationPath;
-    } else {
-      throw new Error(`Download failed with status: ${result.statusCode}`);
+      const result = await downloadResult.promise;
+
+      if (result.statusCode === 200) {
+        DownloadNotificationService.showComplete(`${model.name} downloaded`);
+        return destinationPath;
+      } else {
+        throw new Error(`Download failed with status: ${result.statusCode}`);
+      }
+    } catch (error) {
+      DownloadNotificationService.cancel();
+      throw error;
     }
   }
 

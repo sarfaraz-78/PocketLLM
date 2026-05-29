@@ -3,7 +3,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatScreen } from '../screens/ChatScreen';
 import { ModelListScreen } from '../screens/ModelListScreen';
+import { LocalModelsScreen } from '../screens/LocalModelsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ConversationListScreen } from '../screens/ConversationListScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { COLORS } from '../theme';
 
@@ -21,14 +23,15 @@ export const AppNavigator: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
         },
-        headerStyle: {
-          backgroundColor: colors.surface,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
+        tabBarLabelStyle: {
+          fontSize: 11,
           fontWeight: '600',
         },
+        headerShown: false,
       }}
     >
       <Tab.Screen
@@ -36,7 +39,7 @@ export const AppNavigator: React.FC = () => {
         component={ChatScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Icon name="chatbubbles" size={size} color={color} />
+            <Icon name="chatbubble-ellipses-outline" size={size} color={color} />
           ),
         }}
       />
@@ -45,7 +48,25 @@ export const AppNavigator: React.FC = () => {
         component={ModelListScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Icon name="cube" size={size} color={color} />
+            <Icon name="cube-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Import"
+        component={LocalModelsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="folder-open-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="History"
+        component={ConversationListScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="time-outline" size={size} color={color} />
           ),
         }}
       />
@@ -54,7 +75,7 @@ export const AppNavigator: React.FC = () => {
         component={SettingsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Icon name="settings" size={size} color={color} />
+            <Icon name="settings-outline" size={size} color={color} />
           ),
         }}
       />

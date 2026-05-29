@@ -4,28 +4,25 @@ import { ModelInfo } from '../types';
 interface ModelState {
   downloadedModels: ModelInfo[];
   activeModel: ModelInfo | null;
-  downloadQueue: ModelInfo[];
+  loadingModelId: string | null;
   addDownloadedModel: (model: ModelInfo) => void;
   removeDownloadedModel: (modelId: string) => void;
   setActiveModel: (model: ModelInfo | null) => void;
-  updateDownloadProgress: (modelId: string, progress: number) => void;
-  setDownloadStatus: (
-    modelId: string,
-    status: ModelInfo['downloadStatus']
-  ) => void;
-  addToDownloadQueue: (model: ModelInfo) => void;
-  removeFromDownloadQueue: (modelId: string) => void;
+  updateModelProgress: (modelId: string, progress: number) => void;
+  setModelStatus: (modelId: string, status: ModelInfo['downloadStatus']) => void;
+  setLoadingModelId: (modelId: string | null) => void;
 }
 
 export const useModelStore = create<ModelState>((set) => ({
   downloadedModels: [],
   activeModel: null,
-  downloadQueue: [],
+  loadingModelId: null,
 
   addDownloadedModel: (model) =>
-    set((state) => ({
-      downloadedModels: [...state.downloadedModels, model],
-    })),
+    set((state) => {
+      const filtered = state.downloadedModels.filter((m) => m.id !== model.id);
+      return { downloadedModels: [...filtered, model] };
+    }),
 
   removeDownloadedModel: (modelId) =>
     set((state) => ({
@@ -36,27 +33,19 @@ export const useModelStore = create<ModelState>((set) => ({
 
   setActiveModel: (model) => set({ activeModel: model }),
 
-  updateDownloadProgress: (modelId, progress) =>
+  updateModelProgress: (modelId, progress) =>
     set((state) => ({
-      downloadQueue: state.downloadQueue.map((m) =>
-        m.id === modelId ? { ...m, downloadProgress: progress } : m
+      downloadedModels: state.downloadedModels.map((m) =>
+        m.id === modelId ? { ...m, downloadProgress: progress, downloadStatus: 'downloading' as const } : m
       ),
     })),
 
-  setDownloadStatus: (modelId, status) =>
+  setModelStatus: (modelId, status) =>
     set((state) => ({
-      downloadQueue: state.downloadQueue.map((m) =>
+      downloadedModels: state.downloadedModels.map((m) =>
         m.id === modelId ? { ...m, downloadStatus: status } : m
       ),
     })),
 
-  addToDownloadQueue: (model) =>
-    set((state) => ({
-      downloadQueue: [...state.downloadQueue, model],
-    })),
-
-  removeFromDownloadQueue: (modelId) =>
-    set((state) => ({
-      downloadQueue: state.downloadQueue.filter((m) => m.id !== modelId),
-    })),
+  setLoadingModelId: (modelId) => set({ loadingModelId: modelId }),
 }));

@@ -22,6 +22,7 @@ class MainApplication : Application(), ReactApplication {
               add(DownloadNotificationPackage())
               add(TTSPackage())
               add(BackgroundDownloadPackage())
+              add(NativeFilePickerPackage())
             }
 
         override fun getJSMainModuleName(): String = "index"

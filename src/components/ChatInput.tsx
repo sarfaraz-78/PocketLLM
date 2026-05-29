@@ -79,7 +79,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      keyboardVerticalOffset={0}
     >
       <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         {attachments.length > 0 && (

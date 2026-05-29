@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -69,13 +70,13 @@ export const SettingsScreen: React.FC = () => {
   );
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
-
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
 
       {deviceTier && (
@@ -207,7 +208,8 @@ export const SettingsScreen: React.FC = () => {
           in India
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -222,23 +224,21 @@ interface SliderSettingProps {
 }
 
 const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
-  // Local state for smooth dragging without store re-render fights
-  const [sliderValue, setSliderValue] = useState(value);
-  const [displayValue, setDisplayValue] = useState(step ? value.toString() : value.toFixed(2));
+  const [dragging, setDragging] = useState(false);
+  const [display, setDisplay] = useState(value);
 
-  // Sync with external value changes (e.g. reset)
-  React.useEffect(() => {
-    setSliderValue(value);
-    setDisplayValue(step ? value.toString() : value.toFixed(2));
-  }, [value, step]);
+  const formatVal = (v: number) => {
+    if (step && step >= 1) return Math.round(v).toString();
+    return v.toFixed(2);
+  };
 
   return (
     <View style={styles.sliderBox}>
       <View style={styles.sliderHeader}>
         <Text style={[styles.sliderLabel, { color: colors.text }]}>{label}</Text>
-        <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12' }]}>
+        <View style={[styles.valueBadge, { backgroundColor: dragging ? colors.primary + '30' : colors.primary + '12' }]}>
           <Text style={[styles.valueText, { color: colors.primary }]}>
-            {displayValue}
+            {formatVal(display)}
           </Text>
         </View>
       </View>
@@ -246,16 +246,17 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         style={styles.slider}
         minimumValue={min}
         maximumValue={max}
-        step={step ?? 0.01}
-        value={sliderValue}
+        step={step ?? 0}
+        value={dragging ? display : value}
         onValueChange={(v) => {
-          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
-          setSliderValue(rounded);
-          setDisplayValue(step ? rounded.toString() : rounded.toFixed(2));
+          setDragging(true);
+          setDisplay(v);
         }}
         onSlidingComplete={(v) => {
-          const rounded = step ? Math.round(v / step) * step : parseFloat(v.toFixed(2));
-          onChange(rounded);
+          setDragging(false);
+          const final = step && step >= 1 ? Math.round(v) : parseFloat(v.toFixed(2));
+          setDisplay(final);
+          onChange(final);
         }}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
@@ -267,6 +268,9 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   content: {

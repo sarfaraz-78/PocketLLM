@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import RNFS from 'react-native-fs';
@@ -286,7 +287,7 @@ export const LocalModelsScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
 
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -386,7 +387,7 @@ export const LocalModelsScreen: React.FC = () => {
           />
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

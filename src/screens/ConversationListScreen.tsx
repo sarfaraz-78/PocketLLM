@@ -10,6 +10,7 @@ import {
   StatusBar,
   RefreshControl,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useHistoryStore } from '../store/useHistoryStore';
@@ -138,7 +139,7 @@ export const ConversationListScreen: React.FC<{ navigation: any }> = ({
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
@@ -205,7 +206,7 @@ export const ConversationListScreen: React.FC<{ navigation: any }> = ({
           }
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

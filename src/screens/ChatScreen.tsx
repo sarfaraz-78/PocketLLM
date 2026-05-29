@@ -9,6 +9,7 @@ import {
   Alert,
   TouchableOpacity,
   StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useChatStore } from '../store/useChatStore';
@@ -181,127 +182,132 @@ export const ChatScreen: React.FC = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-        {messages.length > 0 && (
-          <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
-            <Icon name="trash-outline" size={20} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <ModelStatusBar
-        activeModel={activeModel}
-        lastStats={useChatStore.getState().lastStats}
-        darkMode={darkMode}
-      />
-      {messages.length === 0 ? (
-        <View style={styles.emptyState}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '12' }]}>
-            <Icon name="chatbubble-ellipses-outline" size={40} color={colors.primary} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Start a conversation</Text>
-          <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            Load a model and type your first message below
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble message={item} darkMode={darkMode} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.kavContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
+          {messages.length > 0 && (
+            <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
+              <Icon name="trash-outline" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
           )}
-          contentContainerStyle={styles.messageList}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: false })
-          }
+        </View>
+        <ModelStatusBar
+          activeModel={activeModel}
+          lastStats={useChatStore.getState().lastStats}
+          darkMode={darkMode}
         />
-      )}
-
-      {/* Bottom action bar: Thinking toggle + TTS */}
-      <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          style={[
-            styles.actionBtn,
-            { backgroundColor: enableThinking ? colors.primary + '18' : colors.surfaceVariant },
-          ]}
-          onPress={() => setEnableThinking(!enableThinking)}
-          activeOpacity={0.8}
-        >
-          <Icon
-            name={enableThinking ? 'brain' : 'brain-outline'}
-            size={16}
-            color={enableThinking ? colors.primary : colors.textSecondary}
+        {messages.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '12' }]}>
+              <Icon name="chatbubble-ellipses-outline" size={40} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>Start a conversation</Text>
+            <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
+              Load a model and type your first message below
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MessageBubble message={item} darkMode={darkMode} />
+            )}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: false })
+            }
           />
-          <Text style={[styles.actionText, { color: enableThinking ? colors.primary : colors.textSecondary }]}>
-            Thinking
-          </Text>
-        </TouchableOpacity>
+        )}
 
-        {showTTS && (
+        {/* Bottom action bar: Thinking toggle + TTS */}
+        <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              { backgroundColor: isSpeaking ? colors.primary + '18' : colors.surfaceVariant },
+              { backgroundColor: enableThinking ? colors.primary + '18' : colors.surfaceVariant },
             ]}
-            onPress={handleSpeak}
+            onPress={() => setEnableThinking(!enableThinking)}
             activeOpacity={0.8}
           >
             <Icon
-              name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
+              name={enableThinking ? 'brain' : 'brain-outline'}
               size={16}
-              color={isSpeaking ? colors.primary : colors.textSecondary}
+              color={enableThinking ? colors.primary : colors.textSecondary}
             />
-            <Text style={[styles.actionText, { color: isSpeaking ? colors.primary : colors.textSecondary }]}>
-              {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+            <Text style={[styles.actionText, { color: enableThinking ? colors.primary : colors.textSecondary }]}>
+              Thinking
             </Text>
           </TouchableOpacity>
-        )}
 
-        {showTTS && (
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              { backgroundColor: colors.surfaceVariant },
-            ]}
-            onPress={() => setVoicePickerVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Icon name="mic-outline" size={16} color={colors.textSecondary} />
-            <Text style={[styles.actionText, { color: colors.textSecondary }]}>
-              {selectedVoice?.name || 'Voice'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {showTTS && (
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                { backgroundColor: isSpeaking ? colors.primary + '18' : colors.surfaceVariant },
+              ]}
+              onPress={handleSpeak}
+              activeOpacity={0.8}
+            >
+              <Icon
+                name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
+                size={16}
+                color={isSpeaking ? colors.primary : colors.textSecondary}
+              />
+              <Text style={[styles.actionText, { color: isSpeaking ? colors.primary : colors.textSecondary }]}>
+                {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
-      <VoicePicker
-        visible={voicePickerVisible}
-        selectedVoiceId={ttsVoiceId}
-        onSelect={setTTSVoiceId}
-        onClose={() => setVoicePickerVisible(false)}
-        darkMode={darkMode}
-      />
+          {showTTS && (
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                { backgroundColor: colors.surfaceVariant },
+              ]}
+              onPress={() => setVoicePickerVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Icon name="mic-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.actionText, { color: colors.textSecondary }]}>
+                {selectedVoice?.name || 'Voice'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-      <ChatInput
-        onSend={handleSend}
-        onStop={handleStop}
-        isGenerating={isGenerating}
-        darkMode={darkMode}
-      />
-    </KeyboardAvoidingView>
+        <VoicePicker
+          visible={voicePickerVisible}
+          selectedVoiceId={ttsVoiceId}
+          onSelect={setTTSVoiceId}
+          onClose={() => setVoicePickerVisible(false)}
+          darkMode={darkMode}
+        />
+
+        <ChatInput
+          onSend={handleSend}
+          onStop={handleStop}
+          isGenerating={isGenerating}
+          darkMode={darkMode}
+        />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
+    flex: 1,
+  },
+  kavContainer: {
     flex: 1,
   },
   header: {

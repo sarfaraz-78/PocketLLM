@@ -13,6 +13,9 @@ export interface DeviceProfile {
   platform: 'ios' | 'android';
   gpuAvailable: boolean;
   gpuName?: string;
+  cpuModel?: string;
+  abis?: string[];
+  is64Bit?: boolean;
 }
 
 export interface ChatMessage {
@@ -105,6 +108,7 @@ export interface AppSettings {
   darkMode: boolean;
   onboardingComplete: boolean;
   enableThinking: boolean;
+  codingMode: boolean;
   ttsVoiceId: string;
 }
 

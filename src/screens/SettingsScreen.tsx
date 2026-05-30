@@ -17,6 +17,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
 import { DeviceTier } from '../types';
 import { TierBadge } from '../components/TierBadge';
+import { DeviceTierDetector } from '../inference/DeviceTierDetector';
 
 export const SettingsScreen: React.FC = () => {
   const {
@@ -26,14 +27,41 @@ export const SettingsScreen: React.FC = () => {
     completionSettings,
     darkMode,
     enableThinking,
+    codingMode,
     setTierOverride,
     setSystemPrompt,
     setCompletionSettings,
     setDarkMode,
     setEnableThinking,
+    setCodingMode,
     resetToDefaults,
   } = useSettingsStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
+
+  // Get device profile for hardware info display
+  const [deviceProfile, setDeviceProfile] = useState<{
+    cpuModel: string;
+    ramGB: number;
+    gpuName: string;
+    abis: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await DeviceTierDetector.detect();
+        setDeviceProfile({
+          cpuModel: profile.cpuModel || 'Unknown',
+          ramGB: profile.ramGB,
+          gpuName: profile.gpuName || 'CPU',
+          abis: profile.abis || [],
+        });
+      } catch {
+        // silently ignore
+      }
+    };
+    loadProfile();
+  }, []);
 
   const handleReset = () => {
     Alert.alert(
@@ -79,19 +107,42 @@ export const SettingsScreen: React.FC = () => {
       >
       <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
 
-      {deviceTier && (
+      {(deviceTier || deviceProfile) && (
         <View style={[styles.card, { backgroundColor: colors.surface }, SHADOWS.sm]}>
           <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>
             Device
           </Text>
           <View style={styles.tierRow}>
-            <TierBadge tier={deviceTier} size="large" />
+            {deviceTier && <TierBadge tier={deviceTier} size="large" />}
             {tierOverride && (
               <Text style={[styles.overrideText, { color: colors.warning }]}>
                 (Overridden)
               </Text>
             )}
           </View>
+
+          {deviceProfile && (
+            <View style={styles.hardwareInfo}>
+              <View style={styles.hardwareRow}>
+                <Icon name="hardware-chip-outline" size={14} color={colors.textSecondary} />
+                <Text style={[styles.hardwareText, { color: colors.textSecondary }]}>
+                  {deviceProfile.cpuModel}
+                </Text>
+              </View>
+              <View style={styles.hardwareRow}>
+                <Icon name="memory-outline" size={14} color={colors.textSecondary} />
+                <Text style={[styles.hardwareText, { color: colors.textSecondary }]}>
+                  {deviceProfile.ramGB} GB RAM · {deviceProfile.gpuName}
+                </Text>
+              </View>
+              <View style={styles.hardwareRow}>
+                <Icon name="code-slash-outline" size={14} color={colors.textSecondary} />
+                <Text style={[styles.hardwareText, { color: colors.textSecondary }]}>
+                  {deviceProfile.abis.join(', ') || '64-bit'}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -103,6 +154,14 @@ export const SettingsScreen: React.FC = () => {
           <Switch
             value={darkMode}
             onValueChange={setDarkMode}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </SettingRow>
+        <SettingRow icon="code-slash-outline" label="Coding Mode">
+          <Switch
+            value={codingMode}
+            onValueChange={setCodingMode}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFFFFF"
           />
@@ -301,6 +360,22 @@ const styles = StyleSheet.create({
   overrideText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
+  },
+  hardwareInfo: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  hardwareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  hardwareText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '400',
   },
   settingRow: {
     flexDirection: 'row',

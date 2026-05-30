@@ -10,6 +10,7 @@ interface SettingsState extends AppSettings {
   setDarkMode: (darkMode: boolean) => void;
   setOnboardingComplete: (complete: boolean) => void;
   setEnableThinking: (enabled: boolean) => void;
+  setCodingMode: (enabled: boolean) => void;
   setTTSVoiceId: (voiceId: string) => void;
   resetToDefaults: () => void;
 }
@@ -22,6 +23,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   darkMode: true,
   onboardingComplete: false,
   enableThinking: true,
+  codingMode: false,
   ttsVoiceId: 'af_bella',
 
   setDeviceTier: (tier) => set({ deviceTier: tier }),
@@ -34,6 +36,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setDarkMode: (darkMode) => set({ darkMode }),
   setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
   setEnableThinking: (enableThinking) => set({ enableThinking }),
+  setCodingMode: (codingMode) => set({ codingMode }),
   setTTSVoiceId: (ttsVoiceId) => set({ ttsVoiceId }),
   resetToDefaults: () =>
     set({
@@ -42,6 +45,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       tierOverride: false,
       darkMode: true,
       enableThinking: true,
+      codingMode: false,
       ttsVoiceId: 'af_bella',
     }),
 }));

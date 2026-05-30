@@ -163,8 +163,10 @@ export const LocalModelsScreen: React.FC = () => {
   };
 
   const navigateUp = () => {
-    const parent = currentPath.substring(0, currentPath.lastIndexOf('/'));
-    if (parent && parent !== currentPath) {
+    const lastSlash = currentPath.lastIndexOf('/');
+    const parent = currentPath.substring(0, lastSlash);
+    const rootPath = RNFS.ExternalStorageDirectoryPath || RNFS.DocumentDirectoryPath;
+    if (parent && parent !== currentPath && parent.length > rootPath.length) {
       setCurrentPath(parent);
     }
   };

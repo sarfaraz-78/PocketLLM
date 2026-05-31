@@ -58,7 +58,7 @@ export const ChatScreen: React.FC = () => {
     clearMessages,
   } = useChatStore();
   const { activeModel } = useModelStore();
-  const { files } = useWorkspaceStore();
+  const { files, workspaces, activeWorkspaceId } = useWorkspaceStore();
   const {
     systemPrompt,
     completionSettings,
@@ -75,6 +75,8 @@ export const ChatScreen: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [agentIterations, setAgentIterations] = useState(0);
+  const [filesChanged, setFilesChanged] = useState(0);
 
   const selectedVoice = getVoiceById(ttsVoiceId);
   const hasAssistantMessage = messages.some((m) => m.role === 'assistant' && !m.isStreaming && m.content);
@@ -148,36 +150,55 @@ export const ChatScreen: React.FC = () => {
 
     try {
       const codingModeTools = codingMode 
-        ? '\n\n[AGENT WORKSPACE SYSTEM]: You are an Autonomous Coding Agent with full environment control. ' +
-          'You can organize files into isolated projects by creating, listing, or switching workspaces. ' +
-          'When the user requests a new app, website, or task, ALWAYS start by creating a new workspace for it if needed, ' +
-          'then populate it with the necessary files (index.html, styles.css, app.js, etc.) using `ide_write`. ' +
+        ? '\n\n[OPENCODE AGENT SYSTEM]: You are an expert autonomous coding agent operating inside the user\'s ACTIVE workspace. ' +
+          'You work like OpenCode — you understand the existing codebase before making changes.\n\n' +
+          'WORKFLOW (follow this order):\n' +
+          '1. UNDERSTAND: Start by calling `ide_list` to see all files, then `ide_read` on relevant files\n' +
+          '2. PLAN: Briefly explain what you\'ll change and why\n' +
+          '3. EDIT: Use `ide_patch` for surgical edits or `ide_write` for full rewrites. Use `ide_create` for new files\n' +
+          '4. VERIFY: Run `terminal` commands (node, cat) to test your changes if applicable\n\n' +
+          'CRITICAL RULES:\n' +
+          '- NEVER create a new workspace unless the user explicitly asks for a new project\n' +
+          '- ALWAYS read existing files before modifying them\n' +
+          '- Prefer `ide_patch` over `ide_write` for targeted edits (preserves existing code)\n' +
+          '- You can chain multiple tool calls in one response\n\n' +
           'Available Tools:\n' +
-          '- `workspace_create` (args: { name: string }): Creates a new workspace/project and switches to it.\n' +
-          '- `workspace_list` (args: {}): Lists all workspaces.\n' +
-          '- `workspace_switch` (args: { id: string }): Switches to the workspace with the specified ID.\n' +
-          '- `ide_write` (args: { filename: string, content: string }): Writes/updates a file in the active workspace.\n' +
-          '- `ide_read` (args: { filename: string }): Reads a file from the active workspace.\n' +
-          '- `ide_delete` (args: { filename: string }): Deletes a file from the active workspace.\n' +
-          '- `ide_list` (args: {}): Lists all files in the active workspace.\n' +
-          '- `terminal` (args: { command: string }): Executes commands (clear, ls, pwd, uptime, whoami, echo, node <file.js>, run <file.js>). You can run node/run to test and execute your Javascript scripts to check for runtime syntax/logical errors!\n' +
-          '- `browser_open` (args: { url: string }): Opens a URL in the workspace browser.\n\n' +
+          '- `ide_list` (args: {}): List all files in workspace with line counts\n' +
+          '- `ide_read` (args: { filename: string }): Read file with line numbers\n' +
+          '- `ide_write` (args: { filename: string, content: string }): Overwrite/create file entirely\n' +
+          '- `ide_create` (args: { filename: string, content: string }): Create new file (fails if exists)\n' +
+          '- `ide_patch` (args: { filename: string, search: string, replace: string }): Find exact text in file and replace it (surgical edit)\n' +
+          '- `ide_search` (args: { pattern: string, filename?: string }): Search/grep across files for a pattern\n' +
+          '- `ide_delete` (args: { filename: string }): Delete a file\n' +
+          '- `terminal` (args: { command: string }): Run shell commands (ls, cat, node <file>, git, echo, etc.)\n' +
+          '- `browser_open` (args: { url: string }): Open URL in workspace browser\n' +
+          '- `workspace_create` (args: { name: string, template?: string }): Create a NEW project (only when user asks!)\n' +
+          '- `workspace_list` (args: {}): List all workspaces\n' +
+          '- `workspace_switch` (args: { id: string }): Switch to another workspace\n\n' +
           'To call a tool, format it EXACTLY as:\n' +
           '```tool\n' +
           '{"tool": "tool_name", "args": {...}}\n' +
           '```\n' +
-          'You can execute multiple tool blocks in sequence in a single response to construct a fully functional project autonomously. Act like an expert agent!'
+          'You can use multiple tool blocks in one response. After tools execute, you will receive their output and can continue working.'
         : '';
 
       let workspaceContext = '';
       if (codingMode) {
-        const workspaceFiles = useWorkspaceStore.getState().files;
-        const textFiles = workspaceFiles.filter((f) => f.type === 'file' && f.content);
+        const wsStore = useWorkspaceStore.getState();
+        const currentWs = wsStore.workspaces.find(w => w.id === wsStore.activeWorkspaceId);
+        const workspaceFiles = wsStore.files;
+        const textFiles = workspaceFiles.filter((f) => f.type === 'file');
+        
+        workspaceContext = `\n\n[Active Workspace: "${currentWs?.name || 'Default Project'}"]\n`;
         if (textFiles.length > 0) {
-          workspaceContext = '\n\n[Active Workspace Files (You can modify these or create new ones using ide_write)]:\n' + 
-            textFiles.map((f) => `--- File: ${f.name} ---\n${f.content}`).join('\n\n') + '\n\n';
+          workspaceContext += `Files (${textFiles.length}):\n` + 
+            textFiles.map((f) => {
+              const lines = f.content ? f.content.split('\n').length : 0;
+              const chars = f.content ? f.content.length : 0;
+              return `  • ${f.name} (${lines} lines, ${chars} chars)`;
+            }).join('\n') + '\n';
         } else {
-          workspaceContext = '\n\n[Active Workspace]: (Empty)\n\n';
+          workspaceContext += 'Files: (empty workspace)\n';
         }
       }
 
@@ -205,32 +226,131 @@ export const ChatScreen: React.FC = () => {
 
       fullResponse = text;
 
-      // Handle tool calls
+      // Handle tool calls with agentic auto-continue loop
       const toolMatches = fullResponse.match(/```tool\n([\s\S]*?)\n```/g);
       if (toolMatches && codingMode) {
+        let toolResultsText = '';
+        let changedCount = 0;
+        
         for (const match of toolMatches) {
           try {
             const jsonStr = match.replace(/```tool\n/, '').replace(/\n```/, '');
             const toolCall = JSON.parse(jsonStr);
             const result = llamaEngine.executeTool(toolCall.tool, toolCall.args);
+            
+            // Track file changes
+            if (['ide_write', 'ide_create', 'ide_patch', 'ide_delete'].includes(toolCall.tool)) {
+              changedCount++;
+            }
 
-            // Add tool result as assistant message
+            toolResultsText += `[${toolCall.tool}] ${result}\n\n`;
+
+            // Add tool result as a visible message
             const toolResultMsg: ChatMessage = {
               id: (Date.now() + Math.random()).toString(),
               role: 'assistant',
-              content: `[Tool: ${toolCall.tool}]\n${result}`,
+              content: `⚙️ **${toolCall.tool}**${toolCall.args?.filename ? ` → ${toolCall.args.filename}` : ''}\n\`\`\`\n${result}\n\`\`\``,
               timestamp: Date.now(),
               isStreaming: false,
             };
             addMessage(toolResultMsg);
           } catch (e) {
             console.warn('Tool execution error:', e);
+            toolResultsText += `[error] ${e}\n\n`;
           }
         }
 
-        // Remove tool blocks from final response
+        setFilesChanged(prev => prev + changedCount);
+
+        // Remove tool blocks from displayed response
         const cleanText = fullResponse.replace(/```tool\n[\s\S]*?\n```/g, '').trim();
-        updateLastAssistantMessage(cleanText || 'Tool executed', false, stats);
+        updateLastAssistantMessage(cleanText || 'Tools executed.', false, stats);
+
+        // Agentic auto-continue: feed tool results back and let model decide next steps
+        let iteration = 0;
+        const maxIterations = 5;
+        let lastToolResults = toolResultsText;
+
+        while (iteration < maxIterations && lastToolResults.trim()) {
+          iteration++;
+          setAgentIterations(iteration);
+
+          // Build continuation prompt with tool results
+          const continueMessages = [
+            { role: 'system' as const, content: systemPrompt + codingModeTools + workspaceContext },
+            ...useChatStore.getState().messages.map((m) => ({ role: m.role, content: m.content })),
+            { role: 'system' as const, content: `[Tool Results]:\n${lastToolResults}\nContinue if more work is needed, or summarize what you did if complete. Do NOT repeat tool calls that already succeeded.` },
+          ];
+
+          // Create a new streaming assistant message for the continuation
+          const continueMsg: ChatMessage = {
+            id: (Date.now() + iteration + Math.random()).toString(),
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            isStreaming: true,
+          };
+          addMessage(continueMsg);
+
+          let continueStreaming = '';
+          let continueResponse = '';
+          try {
+            const { text: cText, stats: cStats } = await llamaEngine.sendMessage(
+              continueMessages,
+              codingSettings,
+              (token) => {
+                continueStreaming += token;
+                continueResponse += token;
+                updateLastAssistantMessage(continueStreaming, true);
+              },
+              undefined,
+              enableThinking
+            );
+            continueResponse = cText;
+
+            // Check for more tool calls
+            const newToolMatches = continueResponse.match(/```tool\n([\s\S]*?)\n```/g);
+            if (newToolMatches) {
+              lastToolResults = '';
+              for (const match of newToolMatches) {
+                try {
+                  const jsonStr = match.replace(/```tool\n/, '').replace(/\n```/, '');
+                  const toolCall = JSON.parse(jsonStr);
+                  const result = llamaEngine.executeTool(toolCall.tool, toolCall.args);
+                  
+                  if (['ide_write', 'ide_create', 'ide_patch', 'ide_delete'].includes(toolCall.tool)) {
+                    changedCount++;
+                  }
+                  lastToolResults += `[${toolCall.tool}] ${result}\n\n`;
+
+                  const toolMsg: ChatMessage = {
+                    id: (Date.now() + Math.random()).toString(),
+                    role: 'assistant',
+                    content: `⚙️ **${toolCall.tool}**${toolCall.args?.filename ? ` → ${toolCall.args.filename}` : ''}\n\`\`\`\n${result}\n\`\`\``,
+                    timestamp: Date.now(),
+                    isStreaming: false,
+                  };
+                  addMessage(toolMsg);
+                } catch (e) {
+                  console.warn('Tool execution error:', e);
+                  lastToolResults += `[error] ${e}\n\n`;
+                }
+              }
+              setFilesChanged(prev => prev + changedCount);
+
+              const cleanContinue = continueResponse.replace(/```tool\n[\s\S]*?\n```/g, '').trim();
+              updateLastAssistantMessage(cleanContinue || 'Continuing...', false, cStats);
+            } else {
+              // No more tool calls, agent is done
+              updateLastAssistantMessage(continueResponse, false, cStats);
+              lastToolResults = ''; // break the loop
+            }
+          } catch (err) {
+            updateLastAssistantMessage(`Agent error: ${err instanceof Error ? err.message : 'Unknown'}`, false);
+            lastToolResults = '';
+          }
+        }
+        setAgentIterations(0);
       } else {
         updateLastAssistantMessage(fullResponse, false, stats);
       }
@@ -314,19 +434,32 @@ export const ChatScreen: React.FC = () => {
           darkMode={darkMode}
         />
 
-        {codingMode && files.length > 0 && (
+        {codingMode && (
           <View style={[styles.hudContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <View style={styles.hudHeader}>
               <View style={styles.hudTitleRow}>
-                <Icon name="folder-open-outline" size={13} color={colors.primary} />
-                <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>ACTIVE WORKSPACE</Text>
+                <Icon name="terminal-outline" size={13} color={colors.primary} />
+                <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>OPENCODE AGENT</Text>
+                {agentIterations > 0 && (
+                  <View style={[styles.hudAgentBadge, { backgroundColor: colors.warning + '18' }]}>
+                    <Text style={[styles.hudAgentText, { color: colors.warning }]}>thinking step {agentIterations}/5</Text>
+                  </View>
+                )}
               </View>
-              <Text style={[styles.hudFileCount, { color: colors.textTertiary }]}>
-                {files.length} {files.length === 1 ? 'file' : 'files'}
-              </Text>
+              <View style={styles.hudStatsRow}>
+                {filesChanged > 0 && (
+                  <View style={[styles.hudStatPill, { backgroundColor: colors.success + '14' }]}>
+                    <Icon name="create-outline" size={10} color={colors.success} />
+                    <Text style={[styles.hudStatText, { color: colors.success }]}>{filesChanged} changed</Text>
+                  </View>
+                )}
+                <Text style={[styles.hudFileCount, { color: colors.textTertiary }]}>
+                  {files.filter(f => f.type === 'file').length} files
+                </Text>
+              </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hudScroll}>
-              {files.map((file) => (
+              {files.filter(f => f.type === 'file').map((file) => (
                 <TouchableOpacity
                   key={file.id}
                   style={[styles.hudFileBadge, { backgroundColor: colors.background, borderColor: colors.border }]}
@@ -577,5 +710,32 @@ const styles = StyleSheet.create({
   hudFileName: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  hudStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  hudStatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  hudStatText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  hudAgentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+  },
+  hudAgentText: {
+    fontSize: 9,
+    fontWeight: '700',
   },
 });

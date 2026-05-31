@@ -99,36 +99,103 @@ export class LlamaEngine {
 
   executeTool(tool: string, args: any): string {
     switch (tool) {
-      case 'workspace_create':
-        const wsId = useWorkspaceStore.getState().createWorkspace(args.name || 'New Project');
-        return `Workspace "${args.name || 'New Project'}" created successfully with ID "${wsId}". It is now set as the active project. You can start creating files using ide_write.`;
-      case 'workspace_list':
-        const list = useWorkspaceStore.getState().workspaces.map(w => `- ${w.name} (id: ${w.id})`).join('\n');
-        return `Available workspaces:\n${list || '(None)'}`;
-      case 'workspace_switch':
+      case 'workspace_create': {
+        const template = args.template || 'blank';
+        const wsId = useWorkspaceStore.getState().createWorkspace(args.name || 'New Project', template);
+        return `Workspace "${args.name || 'New Project'}" created (template: ${template}) with ID "${wsId}". It is now the active project.`;
+      }
+      case 'workspace_list': {
+        const wsList = useWorkspaceStore.getState().workspaces;
+        const activeId = useWorkspaceStore.getState().activeWorkspaceId;
+        const list = wsList.map(w => `${w.id === activeId ? '→ ' : '  '}${w.name} (id: ${w.id}, ${w.files.length} files)`).join('\n');
+        return `Workspaces:\n${list || '(None)'}`;
+      }
+      case 'workspace_switch': {
         const wsIdSwitch = args.id;
         if (!wsIdSwitch) return 'Error: Workspace ID is required';
         const exists = useWorkspaceStore.getState().workspaces.find(w => w.id === wsIdSwitch);
         if (!exists) return `Error: Workspace with ID ${wsIdSwitch} not found`;
         useWorkspaceStore.getState().switchWorkspace(wsIdSwitch);
-        return `Switched to workspace "${exists.name}" (id: ${wsIdSwitch}) successfully. Active files and terminal have been updated.`;
+        return `Switched to workspace "${exists.name}" (id: ${wsIdSwitch}).`;
+      }
       case 'terminal':
         return this.executeTerminalCommand(args.command || args.cmd || '');
       case 'ide_write':
         this.setIdeFile(args.filename || args.name, args.content || '');
-        return `File ${args.filename || args.name} written successfully`;
-      case 'ide_read':
-        return this.getIdeFile(args.filename || args.name) || 'File not found';
+        return `✓ File "${args.filename || args.name}" written successfully (${(args.content || '').split('\n').length} lines)`;
+      case 'ide_read': {
+        const content = this.getIdeFile(args.filename || args.name);
+        if (content === null) return `Error: File "${args.filename || args.name}" not found in workspace`;
+        const lines = content.split('\n');
+        const numbered = lines.map((l: string, i: number) => `${(i + 1).toString().padStart(4)} │ ${l}`).join('\n');
+        return `File: ${args.filename || args.name} (${lines.length} lines)\n${'─'.repeat(40)}\n${numbered}`;
+      }
+      case 'ide_create': {
+        const fname = args.filename || args.name;
+        const existingFile = useWorkspaceStore.getState().files.find(f => f.name === fname && f.type === 'file');
+        if (existingFile) {
+          return `Error: File "${fname}" already exists. Use ide_write to overwrite or ide_patch to edit it.`;
+        }
+        this.setIdeFile(fname, args.content || '');
+        return `✓ File "${fname}" created (${(args.content || '').split('\n').length} lines)`;
+      }
+      case 'ide_patch': {
+        const patchFile = args.filename || args.name;
+        const currentContent = this.getIdeFile(patchFile);
+        if (currentContent === null) return `Error: File "${patchFile}" not found`;
+        const search = args.search || args.old;
+        const replace = args.replace || args.new;
+        if (!search) return 'Error: "search" parameter is required';
+        if (replace === undefined) return 'Error: "replace" parameter is required';
+        if (!currentContent.includes(search)) {
+          return `Error: Search string not found in "${patchFile}". Make sure the search text matches exactly (including whitespace and indentation).`;
+        }
+        const patched = currentContent.replace(search, replace);
+        this.setIdeFile(patchFile, patched);
+        const patchLine = currentContent.substring(0, currentContent.indexOf(search)).split('\n').length;
+        return `✓ Patched "${patchFile}" at line ${patchLine}. Replaced ${search.split('\n').length} line(s) with ${replace.split('\n').length} line(s).`;
+      }
+      case 'ide_search': {
+        const pattern = (args.pattern || args.query || '').toLowerCase();
+        if (!pattern) return 'Error: "pattern" parameter is required';
+        const searchFiles = useWorkspaceStore.getState().files.filter(f => f.type === 'file');
+        const targetFile = args.filename || args.name;
+        const filesToSearch = targetFile 
+          ? searchFiles.filter(f => f.name.toLowerCase() === targetFile.toLowerCase())
+          : searchFiles;
+        const matches: string[] = [];
+        for (const file of filesToSearch) {
+          if (!file.content) continue;
+          const lines = file.content.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].toLowerCase().includes(pattern)) {
+              matches.push(`  ${file.name}:${i + 1} │ ${lines[i].trim()}`);
+              if (matches.length >= 30) break;
+            }
+          }
+          if (matches.length >= 30) break;
+        }
+        if (matches.length === 0) return `No matches found for "${pattern}" in ${targetFile || 'workspace'}`;
+        return `Found ${matches.length} match(es) for "${pattern}":\n${matches.join('\n')}`;
+      }
       case 'ide_delete':
         this.deleteIdeFile(args.filename || args.name);
-        return `File ${args.filename || args.name} deleted`;
-      case 'ide_list':
-        return `Files: ${this.getIdeFilesList().join(', ')}`;
+        return `✓ File "${args.filename || args.name}" deleted`;
+      case 'ide_list': {
+        const allFiles = useWorkspaceStore.getState().files.filter(f => f.type === 'file');
+        if (allFiles.length === 0) return 'Workspace is empty (no files)';
+        const listing = allFiles.map(f => {
+          const size = f.content ? f.content.length : 0;
+          const lines = f.content ? f.content.split('\n').length : 0;
+          return `  ${f.name} (${lines} lines, ${size} chars)`;
+        }).join('\n');
+        return `Workspace files (${allFiles.length}):\n${listing}`;
+      }
       case 'browser_open':
         this.setCurrentBrowserUrl(args.url);
         return `Opening ${args.url}`;
       default:
-        return `Unknown tool: ${tool}`;
+        return `Unknown tool: ${tool}. Available: ide_list, ide_read, ide_write, ide_create, ide_patch, ide_search, ide_delete, terminal, browser_open`;
     }
   }
 

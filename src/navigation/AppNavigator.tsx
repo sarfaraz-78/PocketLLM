@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, StyleSheet, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatScreen } from '../screens/ChatScreen';
 import { ModelListScreen } from '../screens/ModelListScreen';
@@ -10,15 +11,19 @@ import { TerminalScreen } from '../screens/TerminalScreen';
 import { IdeScreen } from '../screens/IdeScreen';
 import { BrowserScreen } from '../screens/BrowserScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS } from '../theme';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
+const TabIcon: React.FC<{ name: string; focused: boolean; color: string }> = ({ name, focused, color }) => (
+  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+    <Icon name={name} size={22} color={color} />
+  </View>
+);
+
 export const AppNavigator: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const _COLORS = COLORS;
-  const _dark = _COLORS ? (darkMode ? _COLORS.dark : _COLORS.light) : { primary: '#14B8A6', surface: '#1E293B', border: '#334155', textTertiary: '#64748B', text: '#F8FAFC' };
-  const colors = _dark;
+  const colors = darkMode ? COLORS.dark : COLORS.light;
 
   return (
     <Tab.Navigator
@@ -28,13 +33,15 @@ export const AppNavigator: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
+          height: 70,
+          paddingBottom: Platform.OS === 'ios' ? SPACING.lg : SPACING.sm,
+          paddingTop: SPACING.sm,
+          borderTopWidth: 1,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
+          marginTop: 2,
         },
         headerShown: false,
       }}
@@ -43,8 +50,8 @@ export const AppNavigator: React.FC = () => {
         name="Chat"
         component={ChatScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="chatbubble-ellipses-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "chatbubbles" : "chatbubbles-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -52,8 +59,8 @@ export const AppNavigator: React.FC = () => {
         name="Models"
         component={ModelListScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="cube-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "cube" : "cube-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -61,8 +68,8 @@ export const AppNavigator: React.FC = () => {
         name="Import"
         component={LocalModelsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="folder-open-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "folder" : "folder-open-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -70,8 +77,8 @@ export const AppNavigator: React.FC = () => {
         name="History"
         component={ConversationListScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="time-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "time" : "time-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -79,8 +86,8 @@ export const AppNavigator: React.FC = () => {
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="settings-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "settings" : "settings-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -88,8 +95,8 @@ export const AppNavigator: React.FC = () => {
         name="Terminal"
         component={TerminalScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="terminal-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "terminal" : "terminal-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -97,8 +104,8 @@ export const AppNavigator: React.FC = () => {
         name="IDE"
         component={IdeScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="code-slash" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "code-slash" : "code-slash"} focused={focused} color={color} />
           ),
         }}
       />
@@ -106,11 +113,24 @@ export const AppNavigator: React.FC = () => {
         name="Browser"
         component={BrowserScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="globe-outline" size={size} color={color} />
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "globe" : "globe-outline"} focused={focused} color={color} />
           ),
         }}
       />
     </Tab.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    width: 40,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.md,
+  },
+  iconContainerActive: {
+    backgroundColor: 'rgba(20, 184, 166, 0.1)',
+  },
+});

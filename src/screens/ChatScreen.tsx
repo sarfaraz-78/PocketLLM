@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   StatusBar,
   SafeAreaView,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useChatStore } from '../store/useChatStore';
@@ -19,13 +21,14 @@ import { useHistoryStore } from '../store/useHistoryStore';
 import { llamaEngine } from '../inference/LlamaEngine';
 import { simpleTTS } from '../services/SimpleTTS';
 import { getVoiceById } from '../services/VoiceManager';
-import { AttachmentItem } from '../components/ChatInput';
 import { VoicePicker } from '../components/VoicePicker';
 import { MessageBubble } from '../components/MessageBubble';
-import { ChatInput } from '../components/ChatInput';
+import { ChatInput, AttachmentItem } from '../components/ChatInput';
 import { ModelStatusBar } from '../components/ModelStatusBar';
-import { COLORS, SPACING } from '../theme';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
 import { ChatMessage } from '../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
@@ -44,10 +47,9 @@ export const ChatScreen: React.FC = () => {
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   const selectedVoice = getVoiceById(ttsVoiceId);
-
-  // TTS is available when a model is loaded and there's an assistant message
   const hasAssistantMessage = messages.some((m) => m.role === 'assistant' && !m.isStreaming && m.content);
   const showTTS = llamaEngine.isLoaded() && hasAssistantMessage;
 
@@ -65,16 +67,11 @@ export const ChatScreen: React.FC = () => {
       setIsSpeaking(false);
       return;
     }
-
     if (!simpleTTS.isReady()) {
       Alert.alert('TTS Not Available', 'Text-to-Speech engine is not initialized.');
       return;
     }
-
-    const lastAssistant = [...messages]
-      .reverse()
-      .find((m) => m.role === 'assistant' && !m.isStreaming);
-
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && !m.isStreaming);
     if (lastAssistant?.content) {
       setIsSpeaking(true);
       simpleTTS.setVoice(ttsVoiceId);
@@ -88,18 +85,10 @@ export const ChatScreen: React.FC = () => {
       simpleTTS.stop();
       setIsSpeaking(false);
     }
-    Alert.alert(
-      'Clear Chat',
-      'Delete all messages?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: () => clearMessages(),
-        },
-      ]
-    );
+    Alert.alert('Clear Chat', 'Delete all messages?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => clearMessages() },
+    ]);
   };
 
   const handleSend = async (userMessage: string, attachments?: AttachmentItem[]) => {
@@ -109,9 +98,7 @@ export const ChatScreen: React.FC = () => {
     }
 
     const hasImages = attachments && attachments.some((a) => a.type === 'image');
-    const imageAttachments = hasImages
-      ? attachments!.filter((a) => a.type === 'image')
-      : [];
+    const imageAttachments = hasImages ? attachments!.filter((a) => a.type === 'image') : [];
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -130,7 +117,6 @@ export const ChatScreen: React.FC = () => {
       isStreaming: true,
     };
     addMessage(assistantMsg);
-
     setGenerating(true);
 
     try {
@@ -141,7 +127,6 @@ export const ChatScreen: React.FC = () => {
       ];
 
       let streamingText = '';
-
       const codingSettings = codingMode ? { ...completionSettings, temperature: Math.min(completionSettings.temperature, 0.5) } : completionSettings;
 
       const { text, stats } = await llamaEngine.sendMessage(
@@ -159,16 +144,9 @@ export const ChatScreen: React.FC = () => {
       setLastStats(stats);
 
       const finalMessages = useChatStore.getState().messages;
-      await saveCurrentConversation(
-        finalMessages,
-        activeModel?.name || 'Unknown',
-        activeModel?.id || 'unknown'
-      );
+      await saveCurrentConversation(finalMessages, activeModel?.name || 'Unknown', activeModel?.id || 'unknown');
     } catch (error) {
-      updateLastAssistantMessage(
-        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        false
-      );
+      updateLastAssistantMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`, false);
     } finally {
       setGenerating(false);
     }
@@ -177,11 +155,32 @@ export const ChatScreen: React.FC = () => {
   const handleStop = () => {
     llamaEngine.stopGeneration();
     setGenerating(false);
-    updateLastAssistantMessage(
-      messages[messages.length - 1]?.content || '',
-      false
-    );
+    updateLastAssistantMessage(messages[messages.length - 1]?.content || '', false);
   };
+
+  const renderMessage = ({ item }: { item: ChatMessage }) => (
+    <MessageBubble message={item} darkMode={darkMode} />
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primary + '10' }]}>
+        <Icon name="chatbubbles-outline" size={48} color={colors.primary} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>Start a conversation</Text>
+      <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+        Load a model and type your first message below
+      </Text>
+      {!activeModel && (
+        <View style={[styles.emptyHint, { backgroundColor: colors.warning + '10' }]}>
+          <Icon name="warning-outline" size={16} color={colors.warning} />
+          <Text style={[styles.emptyHintText, { color: colors.warning }]}>
+            No model loaded. Go to Models tab to load one.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
@@ -191,50 +190,55 @@ export const ChatScreen: React.FC = () => {
         keyboardVerticalOffset={0}
       >
         <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
+
         <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
-          {messages.length > 0 && (
-            <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
-              <Icon name="trash-outline" size={20} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
+          <View style={styles.headerLeft}>
+            <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
+              <Text style={styles.logoText}>P</Text>
+            </View>
+            <View>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
+              {activeModel && (
+                <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {activeModel.name}
+                </Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            {messages.length > 0 && (
+              <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
+                <Icon name="trash-outline" size={20} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
+
         <ModelStatusBar
           activeModel={activeModel}
           lastStats={useChatStore.getState().lastStats}
           darkMode={darkMode}
         />
+
         {messages.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '12' }]}>
-              <Icon name="chatbubble-ellipses-outline" size={40} color={colors.primary} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>Start a conversation</Text>
-            <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-              Load a model and type your first message below
-            </Text>
-          </View>
+          renderEmptyState()
         ) : (
           <FlatList
             ref={flatListRef}
             data={messages}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <MessageBubble message={item} darkMode={darkMode} />
-            )}
+            renderItem={renderMessage}
             contentContainerStyle={styles.messageList}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: false })
-            }
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            showsVerticalScrollIndicator={false}
           />
         )}
 
-        {/* Bottom action bar: Thinking toggle + TTS */}
         <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              { backgroundColor: enableThinking ? colors.primary + '18' : colors.surfaceVariant },
+              { backgroundColor: enableThinking ? colors.primary + '15' : colors.surfaceVariant },
             ]}
             onPress={() => setEnableThinking(!enableThinking)}
             activeOpacity={0.8}
@@ -253,7 +257,7 @@ export const ChatScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.actionBtn,
-                { backgroundColor: isSpeaking ? colors.primary + '18' : colors.surfaceVariant },
+                { backgroundColor: isSpeaking ? colors.primary + '15' : colors.surfaceVariant },
               ]}
               onPress={handleSpeak}
               activeOpacity={0.8}
@@ -264,23 +268,20 @@ export const ChatScreen: React.FC = () => {
                 color={isSpeaking ? colors.primary : colors.textSecondary}
               />
               <Text style={[styles.actionText, { color: isSpeaking ? colors.primary : colors.textSecondary }]}>
-                {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+                {isSpeaking ? 'Speaking...' : 'Read'}
               </Text>
             </TouchableOpacity>
           )}
 
           {showTTS && (
             <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                { backgroundColor: colors.surfaceVariant },
-              ]}
+              style={[styles.actionBtn, { backgroundColor: colors.surfaceVariant }]}
               onPress={() => setVoicePickerVisible(true)}
               activeOpacity={0.8}
             >
               <Icon name="mic-outline" size={16} color={colors.textSecondary} />
               <Text style={[styles.actionText, { color: colors.textSecondary }]}>
-                {selectedVoice?.name || 'Voice'}
+                {selectedVoice?.name?.split(' ')[0] || 'Voice'}
               </Text>
             </TouchableOpacity>
           )}
@@ -306,54 +307,67 @@ export const ChatScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  kavContainer: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
+  kavContainer: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: Platform.OS === 'ios' ? SPACING.lg : SPACING.md,
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+  logoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  headerBtn: {
-    padding: SPACING.sm,
-  },
-  messageList: {
-    paddingVertical: SPACING.md,
-  },
-  emptyState: {
+  logoText: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+  headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700' },
+  headerSubtitle: { fontSize: FONT_SIZES.xs, marginTop: 1 },
+  headerRight: { flexDirection: 'row', gap: SPACING.xs },
+  headerBtn: { padding: SPACING.sm, borderRadius: BORDER_RADIUS.md },
+  messageList: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.md },
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xxl,
   },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
+  emptyIconWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.lg,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.xl,
     fontWeight: '700',
     marginBottom: SPACING.sm,
   },
-  emptyDesc: {
-    fontSize: 14,
+  emptySubtitle: {
+    fontSize: FONT_SIZES.md,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
+  },
+  emptyHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  emptyHintText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '500',
   },
   actionBar: {
     flexDirection: 'row',
@@ -374,7 +388,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   actionText: {
-    fontSize: 12,
+    fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
 });

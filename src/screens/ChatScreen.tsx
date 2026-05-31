@@ -39,7 +39,7 @@ export const ChatScreen: React.FC = () => {
     clearMessages,
   } = useChatStore();
   const { activeModel } = useModelStore();
-  const { systemPrompt, completionSettings, darkMode, enableThinking, setEnableThinking, ttsVoiceId, setTTSVoiceId } = useSettingsStore();
+  const { systemPrompt, completionSettings, darkMode, enableThinking, codingMode, setEnableThinking, ttsVoiceId, setTTSVoiceId } = useSettingsStore();
   const { saveCurrentConversation } = useHistoryStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -135,16 +135,18 @@ export const ChatScreen: React.FC = () => {
 
     try {
       const messageHistory = [
-        { role: 'system' as const, content: systemPrompt },
+        { role: 'system' as const, content: systemPrompt + (codingMode ? ' You are in CODING MODE. Available tools: TERMINAL (cmd) - execute commands, IDE_FILES - read/write code files, BROWSER_URL - web browsing. Use these tools to help user code effectively.' : '') },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: userMessage },
       ];
 
       let streamingText = '';
 
+      const codingSettings = codingMode ? { ...completionSettings, temperature: Math.min(completionSettings.temperature, 0.5) } : completionSettings;
+
       const { text, stats } = await llamaEngine.sendMessage(
         messageHistory,
-        completionSettings,
+        codingSettings,
         (token) => {
           streamingText += token;
           updateLastAssistantMessage(streamingText, true);

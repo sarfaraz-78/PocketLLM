@@ -46,7 +46,33 @@ export class LlamaEngine {
   private mmprojPath: string | null = null;
   private multimodalEnabled: boolean = false;
 
-async loadModel(modelPath: string, tier: DeviceTier, mmprojPath?: string): Promise<void> {
+  // Terminal state
+  private terminalHistory: Array<{ command: string; output: string }> = [];
+
+  // IDE files
+  private ideFiles: Map<string, { content: string; language: string }> = new Map([
+    ['main.js', { content: '// Welcome to PocketLLM IDE\n\nconsole.log("Hello World");', language: 'javascript' }],
+  ]);
+
+  // Browser history
+  private browserHistory: string[] = [];
+  private currentBrowserUrl: string = 'https://google.com';
+
+  // AI can access these tools
+  getTerminalOutput(): string { return this.terminalHistory.map(h => `> ${h.command}\n${h.output}`).join('\n'); }
+  addTerminalCommand(cmd: string, output: string): void { this.terminalHistory.push({ command: cmd, output }); }
+  getIdeFile(name: string): string | null { return this.ideFiles.get(name)?.content || null; }
+  getIdeFilesList(): string[] { return Array.from(this.ideFiles.keys()); }
+  setIdeFile(name: string, content: string): void {
+    const ext = name.split('.').pop() || 'txt';
+    const langMap: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', java: 'java', kt: 'kotlin', md: 'markdown' };
+    this.ideFiles.set(name, { content, language: langMap[ext] || 'text' });
+  }
+  getBrowserHistory(): string[] { return [...this.browserHistory]; }
+  getCurrentBrowserUrl(): string { return this.currentBrowserUrl; }
+  setCurrentBrowserUrl(url: string): void { this.currentBrowserUrl = url; if (!this.browserHistory.includes(url)) this.browserHistory.push(url); }
+
+  async loadModel(modelPath: string, tier: DeviceTier, mmprojPath?: string): Promise<void> {
     if (this.isLoading) {
       throw new Error('Model load already in progress. Please wait.');
     }

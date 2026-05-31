@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import Slider from '@react-native-community/slider';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
-import { DeviceTier } from '../types';
 import { TierBadge } from '../components/TierBadge';
 import { DeviceTierDetector } from '../inference/DeviceTierDetector';
 
@@ -283,25 +282,13 @@ interface SliderSettingProps {
 }
 
 const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, step, onChange, colors }) => {
-  const [display, setDisplay] = useState(value);
-  const isInteger = step !== undefined && step >= 1;
-
-  useEffect(() => {
-    setDisplay(value);
-  }, [value]);
-
-  const formatVal = (v: number) => {
-    if (isInteger) return Math.round(v).toString();
-    return v.toFixed(2);
-  };
-
   return (
     <View style={styles.sliderBox}>
       <View style={styles.sliderHeader}>
         <Text style={[styles.sliderLabel, { color: colors.text }]}>{label}</Text>
         <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12' }]}>
           <Text style={[styles.valueText, { color: colors.primary }]}>
-            {formatVal(display)}
+            {value}
           </Text>
         </View>
       </View>
@@ -309,13 +296,10 @@ const SliderSetting: React.FC<SliderSettingProps> = ({ label, value, min, max, s
         style={styles.slider}
         minimumValue={min}
         maximumValue={max}
-        step={step ?? 0}
+        step={step}
         value={value}
-        onSlidingComplete={(v) => {
-          const final = isInteger ? Math.round(v) : parseFloat(v.toFixed(2));
-          setDisplay(final);
-          onChange(final);
-        }}
+        onValueChange={onChange}
+        onSlidingComplete={onChange}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
         thumbTintColor={colors.primary}

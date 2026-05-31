@@ -6,6 +6,9 @@ import { ModelListScreen } from '../screens/ModelListScreen';
 import { LocalModelsScreen } from '../screens/LocalModelsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ConversationListScreen } from '../screens/ConversationListScreen';
+import { TerminalScreen } from '../screens/TerminalScreen';
+import { IdeScreen } from '../screens/IdeScreen';
+import { BrowserScreen } from '../screens/BrowserScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { COLORS } from '../theme';
 
@@ -78,6 +81,33 @@ export const AppNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="settings-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Terminal"
+        component={TerminalScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="terminal-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="IDE"
+        component={IdeScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="code-slash" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Browser"
+        component={BrowserScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Icon name="globe-outline" size={size} color={color} />
           ),
         }}
       />

@@ -1,7 +1,7 @@
 import { CompletionSettings } from '../types';
 
 export const DEFAULT_SYSTEM_PROMPT =
-  'You are a helpful, friendly AI assistant. Keep your responses concise and helpful.';
+  'You are a helpful, friendly AI assistant. When the user asks you to execute terminal commands, write code files, or open URLs, you should use the available tools to perform these actions autonomously. To use a tool, include a JSON block in your response like: ```tool\n{"tool": "terminal", "args": {"command": "ls"}}\n``` or ```tool\n{"tool": "ide_write", "args": {"filename": "test.js", "content": "// code"}}\n``` Available tools: terminal (cmd), ide_write, ide_read, ide_delete, ide_list, browser_open.';
 
 export const DEFAULT_COMPLETION_SETTINGS: CompletionSettings = {
   temperature: 0.7,

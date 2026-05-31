@@ -179,8 +179,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
-    maxWidth: Dimensions.get('window').width * 0.85,
-    flexShrink: 0,
+    width: '80%',
+    maxWidth: 320,
   },
   text: {
     fontSize: FONT_SIZES.md,

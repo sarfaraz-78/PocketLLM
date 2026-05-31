@@ -120,8 +120,10 @@ export const ChatScreen: React.FC = () => {
     setGenerating(true);
 
     try {
+      const codingModeTools = codingMode ? ' Tools: terminal (cmd), ide_write, ide_read, ide_delete, ide_list, browser_open. When user asks to execute commands, write code, or open URLs, use these tools by including ```tool\n{"tool": "name", "args": {...}}\n``` in your response.' : '';
+
       const messageHistory = [
-        { role: 'system' as const, content: systemPrompt + (codingMode ? ' You are in CODING MODE. Available tools: TERMINAL (cmd) - execute commands, IDE_FILES - read/write code files, BROWSER_URL - web browsing. Use these tools to help user code effectively.' : '') },
+        { role: 'system' as const, content: systemPrompt + codingModeTools },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: userMessage },
       ];
@@ -129,18 +131,51 @@ export const ChatScreen: React.FC = () => {
       let streamingText = '';
       const codingSettings = codingMode ? { ...completionSettings, temperature: Math.min(completionSettings.temperature, 0.5) } : completionSettings;
 
+      let fullResponse = '';
       const { text, stats } = await llamaEngine.sendMessage(
         messageHistory,
         codingSettings,
         (token) => {
           streamingText += token;
+          fullResponse += token;
           updateLastAssistantMessage(streamingText, true);
         },
         imageAttachments,
         enableThinking
       );
 
-      updateLastAssistantMessage(text, false, stats);
+      fullResponse = text;
+
+      // Handle tool calls
+      const toolMatches = fullResponse.match(/```tool\n([\s\S]*?)\n```/g);
+      if (toolMatches && codingMode) {
+        for (const match of toolMatches) {
+          try {
+            const jsonStr = match.replace(/```tool\n/, '').replace(/\n```/, '');
+            const toolCall = JSON.parse(jsonStr);
+            const result = llamaEngine.executeTool(toolCall.tool, toolCall.args);
+
+            // Add tool result as assistant message
+            const toolResultMsg: ChatMessage = {
+              id: (Date.now() + Math.random()).toString(),
+              role: 'assistant',
+              content: `[Tool: ${toolCall.tool}]\n${result}`,
+              timestamp: Date.now(),
+              isStreaming: false,
+            };
+            addMessage(toolResultMsg);
+          } catch (e) {
+            console.warn('Tool execution error:', e);
+          }
+        }
+
+        // Remove tool blocks from final response
+        const cleanText = fullResponse.replace(/```tool\n[\s\S]*?\n```/g, '').trim();
+        updateLastAssistantMessage(cleanText || 'Tool executed', false, stats);
+      } else {
+        updateLastAssistantMessage(fullResponse, false, stats);
+      }
+
       setLastStats(stats);
 
       const finalMessages = useChatStore.getState().messages;
@@ -183,7 +218,7 @@ export const ChatScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={styles.kavContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

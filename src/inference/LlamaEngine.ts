@@ -58,6 +58,13 @@ export class LlamaEngine {
   private browserHistory: string[] = [];
   private currentBrowserUrl: string = 'https://google.com';
 
+  // Tool execution callback
+  private toolCallback: ((tool: string, args: any) => void) | null = null;
+  setToolCallback(cb: (tool: string, args: any) => void) { this.toolCallback = cb; }
+
+  // Tool types
+  private toolResults: Map<string, string> = new Map();
+
   // AI can access these tools
   getTerminalOutput(): string { return this.terminalHistory.map(h => `> ${h.command}\n${h.output}`).join('\n'); }
   addTerminalCommand(cmd: string, output: string): void { this.terminalHistory.push({ command: cmd, output }); }
@@ -68,9 +75,70 @@ export class LlamaEngine {
     const langMap: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', java: 'java', kt: 'kotlin', md: 'markdown' };
     this.ideFiles.set(name, { content, language: langMap[ext] || 'text' });
   }
+  deleteIdeFile(name: string): void { this.ideFiles.delete(name); }
   getBrowserHistory(): string[] { return [...this.browserHistory]; }
   getCurrentBrowserUrl(): string { return this.currentBrowserUrl; }
   setCurrentBrowserUrl(url: string): void { this.currentBrowserUrl = url; if (!this.browserHistory.includes(url)) this.browserHistory.push(url); }
+  getToolResults(): string { return Array.from(this.toolResults.entries()).map(([k, v]) => `[${k}] ${v}`).join('\n'); }
+  clearToolResults(): void { this.toolResults.clear(); }
+
+  executeTool(tool: string, args: any): string {
+    switch (tool) {
+      case 'terminal':
+        return this.executeTerminalCommand(args.command || args.cmd || '');
+      case 'ide_write':
+        this.setIdeFile(args.filename || args.name, args.content || '');
+        return `File ${args.filename || args.name} written successfully`;
+      case 'ide_read':
+        return this.getIdeFile(args.filename || args.name) || 'File not found';
+      case 'ide_delete':
+        this.deleteIdeFile(args.filename || args.name);
+        return `File ${args.filename || args.name} deleted`;
+      case 'ide_list':
+        return `Files: ${this.getIdeFilesList().join(', ')}`;
+      case 'browser_open':
+        this.setCurrentBrowserUrl(args.url);
+        return `Opening ${args.url}`;
+      default:
+        return `Unknown tool: ${tool}`;
+    }
+  }
+
+  private executeTerminalCommand(cmd: string): string {
+    const lc = cmd.toLowerCase().trim();
+    let result = '';
+
+    if (lc === 'clear') {
+      this.terminalHistory = [];
+      return 'Terminal cleared';
+    }
+    if (lc === 'help') {
+      return `Commands: help, clear, date, echo <text>, ls, pwd, whoami, uptime, cat <file>, history`;
+    }
+    if (lc === 'date') {
+      result = new Date().toLocaleString();
+    } else if (lc.startsWith('echo ')) {
+      result = cmd.substring(5);
+    } else if (lc === 'pwd') {
+      result = '/data/user/0/com.pocketllm';
+    } else if (lc === 'whoami') {
+      result = 'u0_a266 (PocketLLM)';
+    } else if (lc === 'uptime') {
+      result = Math.floor(performance.now() / 1000) + 's (app time)';
+    } else if (lc === 'ls') {
+      result = 'app/\ncache/\nfiles/\nmodels/';
+    } else if (lc === 'history') {
+      result = this.getTerminalOutput();
+    } else if (lc.startsWith('cat ')) {
+      const file = lc.substring(4).trim();
+      result = this.getIdeFile(file) || `File ${file} not found in IDE`;
+    } else {
+      result = `Executed: ${cmd}`;
+    }
+
+    this.addTerminalCommand(cmd, result);
+    return result;
+  }
 
   async loadModel(modelPath: string, tier: DeviceTier, mmprojPath?: string): Promise<void> {
     if (this.isLoading) {

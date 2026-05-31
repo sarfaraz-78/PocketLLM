@@ -3,15 +3,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, StyleSheet, Platform } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ChatScreen } from '../screens/ChatScreen';
+import { WorkspaceScreen } from '../screens/WorkspaceScreen';
 import { ModelListScreen } from '../screens/ModelListScreen';
-import { LocalModelsScreen } from '../screens/LocalModelsScreen';
-import { SettingsScreen } from '../screens/SettingsScreen';
 import { ConversationListScreen } from '../screens/ConversationListScreen';
-import { TerminalScreen } from '../screens/TerminalScreen';
-import { IdeScreen } from '../screens/IdeScreen';
-import { BrowserScreen } from '../screens/BrowserScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
+import { COLORS, SPACING, BORDER_RADIUS } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
@@ -56,20 +53,20 @@ export const AppNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
+        name="Workspace"
+        component={WorkspaceScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name={focused ? "code-working" : "code-working-outline"} focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Models"
         component={ModelListScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name={focused ? "cube" : "cube-outline"} focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Import"
-        component={LocalModelsScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "folder" : "folder-open-outline"} focused={focused} color={color} />
           ),
         }}
       />
@@ -88,33 +85,6 @@ export const AppNavigator: React.FC = () => {
         options={{
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name={focused ? "settings" : "settings-outline"} focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Terminal"
-        component={TerminalScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "terminal" : "terminal-outline"} focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="IDE"
-        component={IdeScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "code-slash" : "code-slash"} focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Browser"
-        component={BrowserScreen}
-        options={{
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "globe" : "globe-outline"} focused={focused} color={color} />
           ),
         }}
       />

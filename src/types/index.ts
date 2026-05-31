@@ -110,6 +110,7 @@ export interface AppSettings {
   enableThinking: boolean;
   codingMode: boolean;
   ttsVoiceId: string;
+  turboQuantEnabled: boolean;
 }
 
 export interface HuggingFaceModel {

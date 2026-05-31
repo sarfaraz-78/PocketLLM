@@ -9,8 +9,8 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
@@ -29,12 +29,14 @@ export const SettingsScreen: React.FC = () => {
     darkMode,
     enableThinking,
     codingMode,
+    turboQuantEnabled,
     setTierOverride,
     setSystemPrompt,
     setCompletionSettings,
     setDarkMode,
     setEnableThinking,
     setCodingMode,
+    setTurboQuantEnabled,
     resetToDefaults,
   } = useSettingsStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
@@ -103,6 +105,26 @@ export const SettingsScreen: React.FC = () => {
             )}
           </Card>
         )}
+
+        <Card style={styles.card} darkMode={darkMode}>
+          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>TurboQuant Engine</Text>
+          <SettingRow icon="flash" label="Enable TurboQuant" darkMode={darkMode} colors={colors}>
+            <Switch 
+              value={turboQuantEnabled} 
+              onValueChange={setTurboQuantEnabled} 
+              trackColor={{ false: colors.border, true: colors.primary }} 
+              thumbColor="#FFFFFF" 
+            />
+          </SettingRow>
+          {turboQuantEnabled && (
+            <View style={[styles.turboInfo, { backgroundColor: colors.primary + '08', borderColor: colors.primary + '20' }]}>
+              <Icon name="speedometer" size={16} color={colors.primary} />
+              <Text style={[styles.turboText, { color: colors.textSecondary }]}>
+                Hardware-accelerated Vulkan/Metal GPU offloading, FlashAttention, and optimized mlock memory pinning are active to boost local generation speed by up to 2.5x!
+              </Text>
+            </View>
+          )}
+        </Card>
 
         <Card style={styles.card} darkMode={darkMode}>
           <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>Appearance</Text>
@@ -236,4 +258,19 @@ const styles = StyleSheet.create({
   textInput: { borderWidth: 1, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, fontSize: FONT_SIZES.md, minHeight: 120, lineHeight: 22 },
   madeIn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, paddingVertical: SPACING.xxl },
   madeInText: { fontSize: FONT_SIZES.sm, fontWeight: '500' },
+  turboInfo: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+    alignItems: 'flex-start',
+  },
+  turboText: {
+    fontSize: FONT_SIZES.xs + 1,
+    lineHeight: 16,
+    flex: 1,
+    fontWeight: '500',
+  },
 });

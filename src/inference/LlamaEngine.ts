@@ -4,6 +4,9 @@ import { PresetManager } from './PresetManager';
 import { STOP_WORDS } from '../utils/stopWords';
 import { AttachmentItem } from '../components/ChatInput';
 
+import { useWorkspaceStore } from '../store/useWorkspaceStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+
 export type RNLlamaMessagePart = {
   type: 'text' | 'image_url' | 'input_audio';
   text?: string;
@@ -46,18 +49,6 @@ export class LlamaEngine {
   private mmprojPath: string | null = null;
   private multimodalEnabled: boolean = false;
 
-  // Terminal state
-  private terminalHistory: Array<{ command: string; output: string }> = [];
-
-  // IDE files
-  private ideFiles: Map<string, { content: string; language: string }> = new Map([
-    ['main.js', { content: '// Welcome to PocketLLM IDE\n\nconsole.log("Hello World");', language: 'javascript' }],
-  ]);
-
-  // Browser history
-  private browserHistory: string[] = [];
-  private currentBrowserUrl: string = 'https://google.com';
-
   // Tool execution callback
   private toolCallback: ((tool: string, args: any) => void) | null = null;
   setToolCallback(cb: (tool: string, args: any) => void) { this.toolCallback = cb; }
@@ -66,19 +57,43 @@ export class LlamaEngine {
   private toolResults: Map<string, string> = new Map();
 
   // AI can access these tools
-  getTerminalOutput(): string { return this.terminalHistory.map(h => `> ${h.command}\n${h.output}`).join('\n'); }
-  addTerminalCommand(cmd: string, output: string): void { this.terminalHistory.push({ command: cmd, output }); }
-  getIdeFile(name: string): string | null { return this.ideFiles.get(name)?.content || null; }
-  getIdeFilesList(): string[] { return Array.from(this.ideFiles.keys()); }
-  setIdeFile(name: string, content: string): void {
-    const ext = name.split('.').pop() || 'txt';
-    const langMap: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', java: 'java', kt: 'kotlin', md: 'markdown' };
-    this.ideFiles.set(name, { content, language: langMap[ext] || 'text' });
+  getTerminalOutput(): string {
+    return useWorkspaceStore.getState().terminalHistory.map(h => `> ${h.command}\n${h.output}`).join('\n');
   }
-  deleteIdeFile(name: string): void { this.ideFiles.delete(name); }
-  getBrowserHistory(): string[] { return [...this.browserHistory]; }
-  getCurrentBrowserUrl(): string { return this.currentBrowserUrl; }
-  setCurrentBrowserUrl(url: string): void { this.currentBrowserUrl = url; if (!this.browserHistory.includes(url)) this.browserHistory.push(url); }
+  addTerminalCommand(cmd: string, output: string): void {
+    useWorkspaceStore.getState().addTerminalCommand(cmd, output);
+  }
+  getIdeFile(name: string): string | null {
+    return useWorkspaceStore.getState().files.find(f => f.name === name && f.type === 'file')?.content || null;
+  }
+  getIdeFilesList(): string[] {
+    return useWorkspaceStore.getState().files.filter(f => f.type === 'file').map(f => f.name);
+  }
+  setIdeFile(name: string, content: string): void {
+    const store = useWorkspaceStore.getState();
+    const existing = store.files.find(f => f.name === name && f.type === 'file');
+    if (existing) {
+      store.updateFileContent(existing.id, content);
+    } else {
+      store.addFile(name, 'file', content);
+    }
+  }
+  deleteIdeFile(name: string): void {
+    const store = useWorkspaceStore.getState();
+    const existing = store.files.find(f => f.name === name && f.type === 'file');
+    if (existing) {
+      store.deleteFile(existing.id);
+    }
+  }
+  getBrowserHistory(): string[] {
+    return useWorkspaceStore.getState().bookmarks.map(b => b.url);
+  }
+  getCurrentBrowserUrl(): string {
+    return useWorkspaceStore.getState().browserUrl;
+  }
+  setCurrentBrowserUrl(url: string): void {
+    useWorkspaceStore.getState().setBrowserUrl(url);
+  }
   getToolResults(): string { return Array.from(this.toolResults.entries()).map(([k, v]) => `[${k}] ${v}`).join('\n'); }
   clearToolResults(): void { this.toolResults.clear(); }
 
@@ -109,7 +124,7 @@ export class LlamaEngine {
     let result = '';
 
     if (lc === 'clear') {
-      this.terminalHistory = [];
+      useWorkspaceStore.getState().clearTerminalHistory();
       return 'Terminal cleared';
     }
     if (lc === 'help') {
@@ -126,7 +141,8 @@ export class LlamaEngine {
     } else if (lc === 'uptime') {
       result = Math.floor(performance.now() / 1000) + 's (app time)';
     } else if (lc === 'ls') {
-      result = 'app/\ncache/\nfiles/\nmodels/';
+      const fileNames = useWorkspaceStore.getState().files.map(f => f.name);
+      result = fileNames.length > 0 ? fileNames.join('\n') : '(empty workspace)';
     } else if (lc === 'history') {
       result = this.getTerminalOutput();
     } else if (lc.startsWith('cat ')) {
@@ -166,27 +182,41 @@ export class LlamaEngine {
 
       this.currentTier = tier;
       const preset = PresetManager.getPresetForTier(tier);
+      const isTurbo = useSettingsStore.getState().turboQuantEnabled;
+
+      // Apply TurboQuant performance optimizations
+      const useMlock = isTurbo ? true : preset.use_mlock;
+      const useMmap = isTurbo ? true : preset.use_mmap;
+      const flashAttnType = isTurbo ? 'on' : preset.flash_attn_type;
+      
+      // Auto-tune threads and layers offloading for high-speed GPU compilation
+      const nThreads = isTurbo ? Math.min(6, preset.n_threads + 1) : preset.n_threads;
+      const nGpuLayers = isTurbo 
+        ? (tier === 'PREMIUM' || tier === 'HIGH' ? 24 : 12) 
+        : preset.n_gpu_layers;
+
+      console.log(`[LlamaEngine] Initializing model with TurboQuant=${isTurbo}. Config: Threads=${nThreads}, GPULayers=${nGpuLayers}, FlashAttn=${flashAttnType}, mlock=${useMlock}`);
 
       // Try loading with preset settings
       try {
         this.context = await initLlama({
           model: modelPath,
-          use_mlock: preset.use_mlock,
-          use_mmap: preset.use_mmap,
+          use_mlock: useMlock,
+          use_mmap: useMmap,
           n_ctx: preset.n_ctx,
-          n_gpu_layers: preset.n_gpu_layers,
-          n_threads: preset.n_threads,
+          n_gpu_layers: nGpuLayers,
+          n_threads: nThreads,
           n_batch: preset.n_batch,
           n_ubatch: preset.n_ubatch,
           cache_type_k: preset.cache_type_k,
           cache_type_v: preset.cache_type_v,
-          flash_attn_type: preset.flash_attn_type,
+          flash_attn_type: flashAttnType,
           no_extra_bufts: preset.no_extra_bufts,
-          ctx_shift: preset.ctx_shift,
+          ctx_shift: true, // Always shift context for turbo speed
         });
       } catch (initErr: any) {
         // If mmap failed, try without mmap (some 32-bit devices have mmap issues on external storage)
-        if (preset.use_mmap && initErr?.message?.toLowerCase()?.includes('mmap')) {
+        if (useMmap && initErr?.message?.toLowerCase()?.includes('mmap')) {
           console.warn('[LlamaEngine] mmap failed, retrying without mmap');
           this.context = await initLlama({
             model: modelPath,
@@ -194,14 +224,14 @@ export class LlamaEngine {
             use_mmap: false,
             n_ctx: preset.n_ctx,
             n_gpu_layers: 0,
-            n_threads: preset.n_threads,
+            n_threads: nThreads,
             n_batch: preset.n_batch,
             n_ubatch: preset.n_ubatch,
             cache_type_k: preset.cache_type_k,
             cache_type_v: preset.cache_type_v,
             flash_attn_type: 'off',
             no_extra_bufts: true,
-            ctx_shift: preset.ctx_shift,
+            ctx_shift: true,
           });
         } else {
           throw initErr;

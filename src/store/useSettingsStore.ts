@@ -12,6 +12,7 @@ interface SettingsState extends AppSettings {
   setEnableThinking: (enabled: boolean) => void;
   setCodingMode: (enabled: boolean) => void;
   setTTSVoiceId: (voiceId: string) => void;
+  setTurboQuantEnabled: (enabled: boolean) => void;
   resetToDefaults: () => void;
 }
 
@@ -25,6 +26,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   enableThinking: true,
   codingMode: false,
   ttsVoiceId: 'af_bella',
+  turboQuantEnabled: true, // Default to true for best fast performance out-of-the-box
 
   setDeviceTier: (tier) => set({ deviceTier: tier }),
   setTierOverride: (override) => set({ tierOverride: override }),
@@ -38,6 +40,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setEnableThinking: (enableThinking) => set({ enableThinking }),
   setCodingMode: (codingMode) => set({ codingMode }),
   setTTSVoiceId: (ttsVoiceId) => set({ ttsVoiceId }),
+  setTurboQuantEnabled: (turboQuantEnabled) => set({ turboQuantEnabled }),
   resetToDefaults: () =>
     set({
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -47,5 +50,6 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       enableThinking: true,
       codingMode: false,
       ttsVoiceId: 'af_bella',
+      turboQuantEnabled: true,
     }),
 }));

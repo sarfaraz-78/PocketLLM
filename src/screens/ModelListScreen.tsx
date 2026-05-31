@@ -14,9 +14,11 @@ import {
   Dimensions,
   PermissionsAndroid,
   Platform,
-  SafeAreaView,
+  FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
+import RNFS from 'react-native-fs';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useModelStore } from '../store/useModelStore';
 import { formatSize, estimateRAM } from '../utils/sizeUtils';
@@ -29,6 +31,15 @@ import { llamaEngine, extractModelSpecs } from '../inference/LlamaEngine';
 import { HuggingFaceApi } from '../services/HuggingFaceApi';
 import { ModelInfo, DeviceTier } from '../types';
 import { extractParams } from '../utils/paramUtils';
+import { scanForModels, ScanResult } from '../services/ModelScanner';
+import { pickFiles } from '../services/NativeFilePicker';
+
+interface LocalFileItem {
+  name: string;
+  path: string;
+  size: number;
+  isDirectory: boolean;
+}
 
 const extractQuantLabel = (fileName: string): string => {
   const match = fileName.match(
@@ -36,8 +47,6 @@ const extractQuantLabel = (fileName: string): string => {
   );
   return match ? match[1].toUpperCase() : 'unknown';
 };
-
-const QUANT_ORDER = ['Q2_K', 'Q3_K_S', 'Q3_K_M', 'Q3_K_L', 'Q4_0', 'Q4_K_S', 'Q4_K_M', 'Q5_0', 'Q5_K_S', 'Q5_K_M', 'Q6_K', 'Q8_0', 'F16', 'FP16', 'BF16', 'F32'];
 
 const getRecommendedQuant = (
   quants: Array<{ fileName: string; sizeMB: number; quantLabel: string }>,
@@ -60,12 +69,12 @@ const getRecommendedQuant = (
     if (match) return match;
   }
 
-  // fallback to middle-sized quant
   const sorted = [...quants].sort((a, b) => a.sizeMB - b.sizeMB);
   return sorted[Math.floor(sorted.length / 2)];
 };
 
 export const ModelListScreen: React.FC = () => {
+  const [subTab, setSubTab] = useState<'explore' | 'import'>('explore');
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ModelInfo[]>([]);
@@ -75,12 +84,18 @@ export const ModelListScreen: React.FC = () => {
   const [quantPickerVisible, setQuantPickerVisible] = useState(false);
   const [pendingModel, setPendingModel] = useState<ModelInfo | null>(null);
 
-  const { deviceTier, darkMode } = useSettingsStore();
+  // Local Import State Variables
+  const [currentPath, setCurrentPath] = useState(RNFS.ExternalStorageDirectoryPath || RNFS.DocumentDirectoryPath);
+  const [localFiles, setLocalFiles] = useState<LocalFileItem[]>([]);
+  const [loadingLocal, setLoadingLocal] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<ScanResult | null>(null);
+
+  const { deviceTier, darkMode, turboQuantEnabled } = useSettingsStore();
   const { downloadedModels, activeModel, setActiveModel, addDownloadedModel, removeDownloadedModel, updateModelProgress, setModelStatus, loadingModelId, setLoadingModelId } =
     useModelStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
 
-  // Merge search results with downloaded models so downloading state is visible
   const mergedSearchResults = searchResults.map((model) => {
     const dl = downloadedModels.find((m) => m.id === model.id);
     return dl || model;
@@ -91,7 +106,6 @@ export const ModelListScreen: React.FC = () => {
   useEffect(() => {
     loadLocalModels();
 
-    // Listen for background download status changes
     const unsubscribe = ModelFileManager.onDownloadStatusChange((tasks) => {
       for (const task of tasks) {
         if (task.status === 'downloading' || task.status === 'pending' || task.status === 'paused') {
@@ -108,6 +122,34 @@ export const ModelListScreen: React.FC = () => {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (subTab === 'import') {
+      loadDirectory(currentPath);
+    }
+  }, [currentPath, subTab]);
+
+  const loadDirectory = async (path: string) => {
+    setLoadingLocal(true);
+    try {
+      const items = await RNFS.readDir(path);
+      const mapped: LocalFileItem[] = items.map((item) => ({
+        name: item.name,
+        path: item.path,
+        size: item.size,
+        isDirectory: item.isDirectory(),
+      }));
+      mapped.sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      setLocalFiles(mapped);
+    } catch (error) {
+      console.error('Error reading directory:', error);
+    } finally {
+      setLoadingLocal(false);
+    }
+  };
 
   const handleDownloadComplete = async (modelId: string, localPath: string) => {
     const model = downloadedModels.find((m) => m.id === modelId);
@@ -134,7 +176,6 @@ export const ModelListScreen: React.FC = () => {
       const localModels = await ModelFileManager.listLocalModels();
       for (const model of localModels) {
         if (!downloadedModels.find((m) => m.id === model.id)) {
-          // Try to read specs for existing local models
           if (model.localPath) {
             try {
               const specs = await extractModelSpecs(model.localPath);
@@ -149,7 +190,6 @@ export const ModelListScreen: React.FC = () => {
         }
       }
 
-      // Fix existing models with Unknown params by re-extracting from name
       downloadedModels.forEach((m) => {
         if (m.params === 'Unknown' && m.name) {
           const extracted = extractParams(m.name);
@@ -166,6 +206,9 @@ export const ModelListScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLocalModels();
+    if (subTab === 'import') {
+      await loadDirectory(currentPath);
+    }
     setRefreshing(false);
   };
 
@@ -175,15 +218,12 @@ export const ModelListScreen: React.FC = () => {
     setHasSearched(true);
     try {
       const hfModels = await HuggingFaceApi.searchModels(searchQuery, 15);
-
-      // Fetch tree API sequentially to avoid rate limits
       const modelsWithSizes: ModelInfo[] = [];
       for (const m of hfModels) {
         const modelId = m.id || m.modelId || '';
         if (!modelId) continue;
 
         let ggufFiles: Array<{ fileName: string; sizeMB: number }> = [];
-
         try {
           const treeFiles = await HuggingFaceApi.getModelTree(modelId);
           ggufFiles = treeFiles.map((f) => ({
@@ -191,7 +231,6 @@ export const ModelListScreen: React.FC = () => {
             sizeMB: Math.round(f.size / (1024 * 1024)),
           }));
         } catch {
-          // fallback to siblings from search (may include sizes)
           const siblings = m.siblings || [];
           ggufFiles = siblings
             .filter((s) => s.rfilename.toLowerCase().endsWith('.gguf'))
@@ -203,7 +242,6 @@ export const ModelListScreen: React.FC = () => {
 
         if (ggufFiles.length === 0) continue;
 
-        // Try HEAD request for files with unknown size (up to 3 per model to avoid rate limits)
         const filesNeedingSize = ggufFiles.filter((f) => f.sizeMB === 0).slice(0, 3);
         for (const f of filesNeedingSize) {
           try {
@@ -212,7 +250,7 @@ export const ModelListScreen: React.FC = () => {
               f.sizeMB = Math.round(bytes / (1024 * 1024));
             }
           } catch {
-            // ignore HEAD failures
+            // ignore
           }
         }
 
@@ -247,7 +285,6 @@ export const ModelListScreen: React.FC = () => {
           availableQuants,
         });
 
-        // Small delay to avoid rate limits
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
 
@@ -299,7 +336,6 @@ export const ModelListScreen: React.FC = () => {
           onPress: async () => {
             await requestNotificationPermission();
 
-            // Add to store as downloading
             const downloadingModel = {
               ...model,
               downloadStatus: 'downloading' as const,
@@ -308,16 +344,12 @@ export const ModelListScreen: React.FC = () => {
             addDownloadedModel(downloadingModel);
 
             try {
-              // Start background download - returns immediately, continues in background
               await ModelFileManager.downloadModel(
                 model,
                 (progress) => {
                   updateModelProgress(model.id, progress);
                 }
               );
-
-              // Download started - it will continue in background
-              // Completion is handled by the status change listener
             } catch (error) {
               addDownloadedModel({
                 ...model,
@@ -366,7 +398,7 @@ export const ModelListScreen: React.FC = () => {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       Alert.alert(
         'Load Failed',
-        msg + '\n\nTip: On 32-bit devices, try a smaller model (0.5B - 1.5B) with Q4_K_M or lower quantization.'
+        msg + '\n\nTip: Toggle "TurboQuant Engine" in Settings to automatically optimize mlock, GPU thread offloading, and FlashAttention coefficients!'
       );
     } finally {
       setLoadingModelId(null);
@@ -444,170 +476,523 @@ export const ModelListScreen: React.FC = () => {
     }
   };
 
+  // Local Import functions
+  const isGguf = (name: string) => name.toLowerCase().endsWith('.gguf');
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      const results = await scanForModels();
+      setScanResults(results);
+    } catch (e) {
+      Alert.alert('Scan Failed', 'Could not scan for model files');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const handleImportScanned = async (item: { path: string; name: string; mmprojPath?: string }) => {
+    try {
+      const modelDir = await ModelFileManager.getModelDirectory();
+      const destPath = `${modelDir}/${item.name}`;
+
+      if (await RNFS.exists(destPath)) {
+        await loadModelFromPath(destPath, item.name, item.mmprojPath);
+        return;
+      }
+
+      await RNFS.copyFile(item.path, destPath);
+
+      let mmprojDestPath: string | undefined;
+      if (item.mmprojPath) {
+        const mmprojName = item.mmprojPath.split('/').pop() || '';
+        mmprojDestPath = `${modelDir}/${mmprojName}`;
+        if (!(await RNFS.exists(mmprojDestPath))) {
+          await RNFS.copyFile(item.mmprojPath, mmprojDestPath);
+        }
+      }
+
+      await loadModelFromPath(destPath, item.name, mmprojDestPath);
+    } catch (error) {
+      Alert.alert('Import Failed', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  const handleLoadLocalModel = async (file: LocalFileItem) => {
+    if (!isGguf(file.name)) return;
+    await loadModelFromPath(file.path, file.name, undefined);
+  };
+
+  const loadModelFromPath = async (filePath: string, fileName: string, mmprojPath?: string) => {
+    const modelName = fileName.replace(/\.gguf$/i, '');
+    try {
+      const stat = await RNFS.stat(filePath);
+      await llamaEngine.loadModel(filePath, deviceTier || DeviceTier.MEDIUM, mmprojPath);
+
+      let specs: ModelInfo['specs'] = undefined;
+      try {
+        specs = await extractModelSpecs(filePath);
+      } catch (e) {
+        console.warn('[LocalModels] Could not extract specs:', e);
+      }
+
+      const model: ModelInfo = {
+        id: fileName,
+        name: modelName,
+        repoId: 'local',
+        fileName: fileName,
+        downloadUrl: '',
+        sizeMB: Math.round(stat.size / (1024 * 1024)),
+        quantization: 'unknown',
+        params: extractParams(fileName),
+        architecture: 'unknown',
+        tier: deviceTier || DeviceTier.MEDIUM,
+        localPath: filePath,
+        downloadStatus: 'downloaded',
+        specs,
+        mmprojPath,
+        isMultimodal: !!mmprojPath,
+      };
+
+      setActiveModel(model);
+      addDownloadedModel(model);
+      Alert.alert('Success', `${modelName} loaded!`);
+      loadDirectory(currentPath);
+    } catch (error) {
+      Alert.alert('Load Failed', error instanceof Error ? error.message : 'Unknown error');
+    }
+  };
+
+  const navigateUp = () => {
+    const lastSlash = currentPath.lastIndexOf('/');
+    const parent = currentPath.substring(0, lastSlash);
+    const rootPath = RNFS.ExternalStorageDirectoryPath || RNFS.DocumentDirectoryPath;
+    if (parent && parent !== currentPath && parent.length > rootPath.length) {
+      setCurrentPath(parent);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const picked = await pickFiles();
+      if (!picked || picked.length === 0) return;
+
+      const modelDir = await ModelFileManager.getModelDirectory();
+      const importedNames: string[] = [];
+      const skippedNames: string[] = [];
+
+      for (const file of picked) {
+        if (!isGguf(file.name)) continue;
+        const destPath = `${modelDir}/${file.name}`;
+
+        if (await RNFS.exists(destPath)) {
+          skippedNames.push(file.name);
+          continue;
+        }
+
+        try {
+          await RNFS.copyFile(file.path, destPath);
+          importedNames.push(file.name);
+        } catch (e) {
+          console.warn(`Failed to copy ${file.name}:`, e);
+          skippedNames.push(file.name + ' (failed)');
+        }
+      }
+
+      loadDirectory(currentPath);
+
+      let message = '';
+      if (importedNames.length > 0) {
+        message += `Imported ${importedNames.length} file(s):\n${importedNames.join('\n')}`;
+      }
+      if (skippedNames.length > 0) {
+        if (message) message += '\n\n';
+        message += `Skipped ${skippedNames.length} file(s):\n${skippedNames.join('\n')}`;
+      }
+      Alert.alert('Import Complete', message || 'No files imported');
+    } catch (err: any) {
+      if (err?.message?.includes('CANCELLED') || err?.code === 'CANCELLED') {
+        return;
+      }
+      Alert.alert('Import Failed', err?.message || 'Could not import files');
+    }
+  };
+
+  const renderLocalFileItem = ({ item }: { item: LocalFileItem }) => {
+    if (item.isDirectory) {
+      return (
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: colors.surface }, SHADOWS.xs]}
+          onPress={() => setCurrentPath(item.path)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconBox, { backgroundColor: colors.primary + '12' }]}>
+            <Icon name="folder" size={22} color={colors.primary} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>Folder</Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+      );
+    }
+
+    const gguf = isGguf(item.name);
+    return (
+      <TouchableOpacity
+        style={[styles.row, { backgroundColor: colors.surface }, SHADOWS.xs, gguf && { borderColor: colors.primary + '30', borderWidth: 1 }]}
+        onPress={() => gguf && handleLoadLocalModel(item)}
+        activeOpacity={0.7}
+        disabled={!gguf}
+      >
+        <View style={[styles.iconBox, { backgroundColor: gguf ? colors.success + '12' : colors.border }]}>
+          <Icon name={gguf ? 'cube' : 'document-outline'} size={22} color={gguf ? colors.success : colors.textTertiary} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>{formatSize(item.size)}</Text>
+        </View>
+        {gguf && (
+          <View style={[styles.loadBadge, { backgroundColor: colors.primary + '12' }]}>
+            <Text style={[styles.loadText, { color: colors.primary }]}>Load</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderScanResultItem = (item: { path: string; name: string; size: number; mmprojPath?: string; mmprojName?: string }) => {
+    const isVision = !!item.mmprojPath;
+    return (
+      <View style={[styles.scanRow, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+        <View style={[styles.iconBox, { backgroundColor: isVision ? colors.primary + '15' : colors.success + '12' }]}>
+          <Icon name={isVision ? 'eye' : 'cube'} size={22} color={isVision ? colors.primary : colors.success} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>
+            {formatSize(item.size)}
+            {isVision && ' · Vision Model'}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.importBadge, { backgroundColor: colors.primary }]}
+          onPress={() => handleImportScanned(item)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.importText}>Import</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Models</Text>
-        {activeModel && (
-          <View style={[styles.activePill, { backgroundColor: colors.success + '14' }]}>
-            <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
-            <Text style={[styles.activeText, { color: colors.success }]}>Active</Text>
-          </View>
-        )}
-      </View>
-
-      {/* HuggingFace Search */}
-      <View style={[styles.searchCard, { backgroundColor: colors.surface }, SHADOWS.sm]}>
-        <Text style={[styles.searchLabel, { color: colors.textSecondary }]}>
-          <Icon name="globe-outline" size={14} /> Search HuggingFace
-        </Text>
-        <View style={styles.searchRow}>
-          <TextInput
-            style={[
-              styles.searchInput,
-              { backgroundColor: colors.inputBackground, color: colors.text, borderColor: colors.border },
-            ]}
-            placeholder="Search models (e.g. llama, qwen, phi)"
-            placeholderTextColor={colors.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          <TouchableOpacity
-            style={[styles.searchBtn, { backgroundColor: colors.primary }]}
-            onPress={handleSearch}
-            activeOpacity={0.85}
-          >
-            {isSearching ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Icon name="search" size={18} color="#FFFFFF" />
+      {/* Modern Fixed Header */}
+      <View style={[styles.headerFixed, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.headerTitleText, { color: colors.text }]}>Models Manager</Text>
+          <View style={{ flexDirection: 'row', gap: SPACING.xs, alignItems: 'center' }}>
+            {turboQuantEnabled && (
+              <View style={[styles.activePill, { backgroundColor: colors.primary + '14', borderColor: colors.primary + '30', borderWidth: 1 }]}>
+                <Icon name="flash" size={11} color={colors.primary} />
+                <Text style={[styles.activeText, { color: colors.primary }]}>TurboQuant ⚡</Text>
+              </View>
             )}
+            {activeModel && (
+              <View style={[styles.activePill, { backgroundColor: colors.success + '14' }]}>
+                <View style={[styles.activeDot, { backgroundColor: colors.success }]} />
+                <Text style={[styles.activeText, { color: colors.success }]}>Active</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Premium Tab Segments */}
+        <View style={[styles.segmentedControl, { backgroundColor: darkMode ? '#0b0f19' : '#f1f5f9' }]}>
+          <TouchableOpacity
+            style={[
+              styles.segmentBtn,
+              subTab === 'explore' && [styles.activeSegmentBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
+            ]}
+            onPress={() => setSubTab('explore')}
+            activeOpacity={0.8}
+          >
+            <Icon name="search" size={14} color={subTab === 'explore' ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.segmentText, { color: subTab === 'explore' ? colors.text : colors.textSecondary }]}>
+              Explore Models
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.segmentBtn,
+              subTab === 'import' && [styles.activeSegmentBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
+            ]}
+            onPress={() => setSubTab('import')}
+            activeOpacity={0.8}
+          >
+            <Icon name="folder-open" size={14} color={subTab === 'import' ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.segmentText, { color: subTab === 'import' ? colors.text : colors.textSecondary }]}>
+              Import Local
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search Results */}
-      {hasSearched && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Search Results
-          </Text>
-          {isSearching ? (
-            <View style={styles.searchingBox}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.searchingText, { color: colors.textSecondary }]}>
-                Searching HuggingFace...
-              </Text>
+      {subTab === 'explore' ? (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Active Model Indicator Panel */}
+          {activeModel && (
+            <View style={[styles.activeModelCard, { backgroundColor: colors.surface, borderColor: colors.success + '40' }, SHADOWS.sm]}>
+              <View style={styles.activeModelRow}>
+                <View style={[styles.activeIconContainer, { backgroundColor: colors.success + '12' }]}>
+                  <Icon name="cube" size={24} color={colors.success} />
+                </View>
+                <View style={styles.activeModelDetails}>
+                  <Text style={[styles.activeModelLabel, { color: colors.success }]}>ACTIVE INFERENCE RUNNING</Text>
+                  <Text style={[styles.activeModelName, { color: colors.text }]} numberOfLines={1}>{activeModel.name}</Text>
+                  <Text style={[styles.activeModelSpecs, { color: colors.textSecondary }]}>
+                    Size: {formatSize(activeModel.sizeMB * 1024 * 1024)} · Params: {activeModel.params}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.unloadBtn, { backgroundColor: colors.error }]}
+                  onPress={handleUnload}
+                  activeOpacity={0.8}
+                >
+                  <Icon name="power" size={16} color="#FFFFFF" />
+                  <Text style={styles.unloadBtnText}>Unload</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          ) : searchResults.length === 0 ? (
-            <Text style={[styles.noResults, { color: colors.textSecondary }]}>
-              No GGUF models found. Try a different query.
+          )}
+
+          {/* Search HuggingFace */}
+          <View style={[styles.searchCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+            <Text style={[styles.searchLabel, { color: colors.textSecondary }]}>
+              <Icon name="globe-outline" size={14} /> Search HuggingFace Repo
             </Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {mergedSearchResults.map((model) => (
+            <View style={styles.searchRow}>
+              <TextInput
+                style={[styles.searchInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                placeholder="Search models (e.g. llama, qwen, phi)"
+                placeholderTextColor={colors.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+              />
+              <TouchableOpacity
+                style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSearch}
+                activeOpacity={0.85}
+              >
+                {isSearching ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Icon name="search" size={18} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search Results */}
+          {hasSearched && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Search Results</Text>
+              {isSearching ? (
+                <View style={styles.searchingBox}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.searchingText, { color: colors.textSecondary }]}>Searching Hugging Face...</Text>
+                </View>
+              ) : mergedSearchResults.length === 0 ? (
+                <Text style={[styles.noResults, { color: colors.textSecondary }]}>No GGUF models found</Text>
+              ) : (
+                mergedSearchResults.map((model) => (
+                  <ModelCard
+                    key={model.id}
+                    model={model}
+                    isActive={activeModel?.id === model.id}
+                    isLoading={loadingModelId === model.id}
+                    onLoad={() => handleLoad(model)}
+                    onUnload={handleUnload}
+                    onDelete={() => handleDelete(model)}
+                    onRetry={() => handleRetry(model)}
+                    onCancel={() => handleCancel(model)}
+                    onDownload={() => handleDownload(model)}
+                    darkMode={darkMode}
+                  />
+                ))
+              )}
+            </View>
+          )}
+
+          {/* Recommended Models */}
+          <View style={styles.section}>
+            <View style={styles.recommendedHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommended for You</Text>
+              <TierBadge tier={deviceTier} />
+            </View>
+            {recommendedModels.map((model) => {
+              const dl = downloadedModels.find((m) => m.id === model.id);
+              const m = dl || model;
+              return (
                 <ModelCard
-                  key={model.id}
-                  model={model}
-                  isActive={activeModel?.id === model.id}
-                  isLoading={loadingModelId === model.id}
-                  onDownload={() => handleDownload(model)}
-                  onLoad={() => handleLoad(model)}
+                  key={m.id}
+                  model={m}
+                  isActive={activeModel?.id === m.id}
+                  isLoading={loadingModelId === m.id}
+                  onLoad={() => handleLoad(m)}
                   onUnload={handleUnload}
-                  onDelete={() => handleDelete(model)}
-                  onRetry={() => handleRetry(model)}
-                  onCancel={() => handleCancel(model)}
+                  onDelete={() => handleDelete(m)}
+                  onRetry={() => handleRetry(m)}
+                  onCancel={() => handleCancel(m)}
+                  onDownload={() => handleDownload(m)}
                   darkMode={darkMode}
                 />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      )}
-
-      {deviceTier && (
-        <View style={[styles.tierCard, { backgroundColor: colors.surface }, SHADOWS.sm]}>
-          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
-            Your Device
-          </Text>
-          <View style={styles.tierRow}>
-            <TierBadge tier={deviceTier} size="medium" />
-            <Text style={[styles.tierDesc, { color: colors.textSecondary }]}>
-              Models optimized for your hardware
-            </Text>
+              );
+            })}
           </View>
-        </View>
-      )}
 
-      {downloadedModels.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Downloaded
-          </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {downloadedModels.map((model) => (
-              <ModelCard
-                key={model.id}
-                model={model}
-                isActive={activeModel?.id === model.id}
-                isLoading={loadingModelId === model.id}
-                onLoad={() => handleLoad(model)}
-                onUnload={handleUnload}
-                onDelete={() => handleDelete(model)}
-                onRetry={() => handleRetry(model)}
-                onCancel={() => handleCancel(model)}
-                darkMode={darkMode}
-              />
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-          Recommended
-        </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {recommendedModels.map((model) => (
-            <ModelCard
-              key={model.id}
-              model={model}
-              isActive={activeModel?.id === model.id}
-              isLoading={loadingModelId === model.id}
-              onDownload={() => handleDownload(model)}
-              onLoad={() => handleLoad(model)}
-              onUnload={handleUnload}
-              onDelete={() => handleDelete(model)}
-              onRetry={() => handleRetry(model)}
-              onCancel={() => handleCancel(model)}
-              darkMode={darkMode}
-            />
-          ))}
+          {/* Downloaded/Local Models */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Loaded Library</Text>
+            {downloadedModels.filter((m) => m.repoId !== 'local').length === 0 ? (
+              <View style={[styles.infoCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+                <Icon name="information-circle-outline" size={20} color={colors.textTertiary} />
+                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                  No models downloaded yet. Search online or scan local storage to begin.
+                </Text>
+              </View>
+            ) : (
+              downloadedModels
+                .filter((m) => m.repoId !== 'local')
+                .map((model) => (
+                  <ModelCard
+                    key={model.id}
+                    model={model}
+                    isActive={activeModel?.id === model.id}
+                    isLoading={loadingModelId === model.id}
+                    onLoad={() => handleLoad(model)}
+                    onUnload={handleUnload}
+                    onDelete={() => handleDelete(model)}
+                    onRetry={() => handleRetry(model)}
+                    onCancel={() => handleCancel(model)}
+                    onDownload={() => handleDownload(model)}
+                    darkMode={darkMode}
+                  />
+                ))
+            )}
+          </View>
         </ScrollView>
-      </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* File Picker Explorer Bar Actions */}
+          <View style={[styles.importActionBar, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+            <View style={styles.importBarLeft}>
+              <Icon name="folder-open" size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pathLabel, { color: colors.textSecondary }]}>CURRENT DIRECTORY</Text>
+                <Text style={[styles.pathText, { color: colors.text }]} numberOfLines={1}>
+                  {currentPath}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.importBarActions}>
+              <TouchableOpacity onPress={handleImport} style={[styles.actionIconBtn, { backgroundColor: colors.primary + '10' }]}>
+                <Icon name="add-circle-outline" size={20} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={navigateUp} style={[styles.actionIconBtn, { backgroundColor: colors.border }]}>
+                <Icon name="arrow-up" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
 
-      <View style={[styles.infoCard, { backgroundColor: colors.surface }, SHADOWS.sm]}>
-        <Icon name="information-circle-outline" size={20} color={colors.textTertiary} />
-        <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-          Models are recommended based on your device RAM. Lower tier = faster but less capable.
-          You can also import any GGUF file from storage.
-        </Text>
-      </View>
+          {/* Auto Finder scanned results */}
+          <View style={[styles.scanCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+            <View style={styles.scanHeader}>
+              <View style={styles.scanTitleRow}>
+                <Icon name="scan-outline" size={20} color={colors.primary} />
+                <Text style={[styles.scanTitle, { color: colors.text }]}>Auto Finder Scan</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.scanBtn, { backgroundColor: scanning ? colors.border : colors.primary }]}
+                onPress={handleScan}
+                disabled={scanning}
+                activeOpacity={0.8}
+              >
+                {scanning ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text style={styles.scanBtnText}>Scan Storage</Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-      {/* Quantization Picker Modal */}
+            {scanning && (
+              <Text style={[styles.scanningText, { color: colors.textSecondary }]}>
+                Scanning typical folders for GGUF model files...
+              </Text>
+            )}
+
+            {scanResults && scanResults.ggufFiles.length === 0 && !scanning && (
+              <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
+                No GGUF models discovered automatically.
+              </Text>
+            )}
+
+            {scanResults && scanResults.ggufFiles.length > 0 && (
+              <View style={styles.resultsList}>
+                <Text style={[styles.resultsLabel, { color: colors.textSecondary }]}>
+                  FOUND IN AUTO-SCAN ({scanResults.ggufFiles.length})
+                </Text>
+                {scanResults.ggufFiles.map((item) => (
+                  <View key={item.path}>{renderScanResultItem(item)}</View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Directory Explorer list */}
+          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: SPACING.md }]}>Storage Folders</Text>
+          {loadingLocal ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              data={localFiles}
+              keyExtractor={(item) => item.path}
+              renderItem={renderLocalFileItem}
+              scrollEnabled={false}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Icon name="folder-open-outline" size={48} color={colors.textTertiary} />
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No folders or GGUF files found.</Text>
+                </View>
+              }
+            />
+          )}
+        </ScrollView>
+      )}
+
+      {/* Quantization Modal */}
       <Modal
         visible={quantPickerVisible}
         transparent
@@ -617,23 +1002,16 @@ export const ModelListScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHandle} />
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Choose Quantization
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-              {pendingModel?.name}
-            </Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Quantization</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{pendingModel?.name}</Text>
             {pendingModel?.params && pendingModel.params !== 'Unknown' && (
               <View style={[styles.paramsBadge, { backgroundColor: colors.primary + '10' }]}>
                 <Icon name="hardware-chip-outline" size={12} color={colors.primary} />
-                <Text style={[styles.paramsBadgeText, { color: colors.primary }]}>
-                  {pendingModel.params} parameters
-                </Text>
+                <Text style={[styles.paramsBadgeText, { color: colors.primary }]}>{pendingModel.params} parameters</Text>
               </View>
             )}
 
             <ScrollView style={styles.quantList} showsVerticalScrollIndicator={false}>
-              {/* Recommended option */}
               {(() => {
                 const rec = getRecommendedQuant(pendingModel?.availableQuants || [], deviceTier);
                 if (!rec) return null;
@@ -645,26 +1023,14 @@ export const ModelListScreen: React.FC = () => {
                   >
                     <View style={styles.quantOptionLeft}>
                       <View style={[styles.quantBadge, { backgroundColor: colors.success + '14' }]}>
-                        <Text style={[styles.quantBadgeText, { color: colors.success }]}>
-                          {rec.quantLabel}
-                        </Text>
+                        <Text style={[styles.quantBadgeText, { color: colors.success }]}>{rec.quantLabel}</Text>
                       </View>
                       <View style={styles.recommendedLabel}>
                         <Icon name="star" size={12} color={colors.success} />
-                        <Text style={[styles.recommendedText, { color: colors.success }]}>
-                          Recommended
-                        </Text>
+                        <Text style={[styles.recommendedText, { color: colors.success }]}>Recommended</Text>
                       </View>
                       <View style={[styles.sizeBadge, { backgroundColor: colors.success + '10' }]}>
-                        <Text style={[styles.sizeBadgeText, { color: colors.success }]}>
-                          {formatSize(rec.sizeMB)}
-                        </Text>
-                      </View>
-                      <View style={[styles.ramBadge, { backgroundColor: colors.info + '10' }]}>
-                        <Icon name="hardware-chip-outline" size={10} color={colors.info} />
-                        <Text style={[styles.ramBadgeText, { color: colors.info }]}>
-                          ~{estimateRAM(rec.sizeMB)} RAM
-                        </Text>
+                        <Text style={[styles.sizeBadgeText, { color: colors.success }]}>{formatSize(rec.sizeMB * 1024 * 1024)}</Text>
                       </View>
                     </View>
                     <Icon name="download-outline" size={20} color={colors.success} />
@@ -672,52 +1038,30 @@ export const ModelListScreen: React.FC = () => {
                 );
               })()}
 
-              {/* Divider between recommended and all options */}
               {(() => {
                 const rec = getRecommendedQuant(pendingModel?.availableQuants || [], deviceTier);
                 if (!rec || (pendingModel?.availableQuants?.length || 0) <= 1) return null;
                 return (
                   <View style={[styles.quantDivider, { backgroundColor: colors.border }]}>
-                    <Text style={[styles.quantDividerText, { color: colors.textTertiary }]}>
-                      All variants
-                    </Text>
+                    <Text style={[styles.quantDividerText, { color: colors.textTertiary }]}>All variants</Text>
                   </View>
                 );
               })()}
 
               {(() => {
-                const rec = getRecommendedQuant(pendingModel?.availableQuants || [], deviceTier);
                 return (pendingModel?.availableQuants || []).map((quant) => (
                   <TouchableOpacity
                     key={quant.fileName}
-                    style={[
-                      styles.quantOption,
-                      { borderBottomColor: colors.border },
-                    ]}
+                    style={[styles.quantOption, { borderBottomColor: colors.border }]}
                     onPress={() => selectQuantAndDownload(quant)}
                     activeOpacity={0.7}
                   >
                     <View style={styles.quantOptionLeft}>
-                      <View
-                        style={[
-                          styles.quantBadge,
-                          { backgroundColor: colors.primary + '12' },
-                        ]}
-                      >
-                        <Text style={[styles.quantBadgeText, { color: colors.primary }]}>
-                          {quant.quantLabel}
-                        </Text>
+                      <View style={[styles.quantBadge, { backgroundColor: colors.primary + '12' }]}>
+                        <Text style={[styles.quantBadgeText, { color: colors.primary }]}>{quant.quantLabel}</Text>
                       </View>
                       <View style={[styles.sizeBadge, { backgroundColor: colors.surfaceVariant }]}>
-                        <Text style={[styles.sizeBadgeText, { color: colors.textSecondary }]}>
-                          {formatSize(quant.sizeMB)}
-                        </Text>
-                      </View>
-                      <View style={[styles.ramBadge, { backgroundColor: colors.info + '10' }]}>
-                        <Icon name="hardware-chip-outline" size={10} color={colors.info} />
-                        <Text style={[styles.ramBadgeText, { color: colors.info }]}>
-                          ~{estimateRAM(quant.sizeMB)} RAM
-                        </Text>
+                        <Text style={[styles.sizeBadgeText, { color: colors.textSecondary }]}>{formatSize(quant.sizeMB * 1024 * 1024)}</Text>
                       </View>
                     </View>
                     <Icon name="download-outline" size={20} color={colors.primary} />
@@ -736,7 +1080,6 @@ export const ModelListScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </ScrollView>
     </SafeAreaView>
   );
 };
@@ -745,114 +1088,318 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  headerFixed: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: Platform.OS === 'ios' ? SPACING.sm : SPACING.md,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    gap: SPACING.md,
   },
-  content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.huge,
-  },
-  header: {
+  headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
   },
-  headerTitle: {
-    fontSize: FONT_SIZES.xxl,
+  headerTitleText: {
+    fontSize: 20,
     fontWeight: '800',
+    letterSpacing: -0.5,
   },
   activePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.full,
   },
   activeDot: {
     width: 6,
     height: 6,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 3,
   },
   activeText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: BORDER_RADIUS.xl,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  segmentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    flex: 1,
+    paddingVertical: SPACING.sm - 2,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  activeSegmentBtn: {
+    // dynamically applied
+  },
+  segmentText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: SPACING.md,
+    paddingBottom: SPACING.huge,
+    gap: SPACING.md,
+  },
+  activeModelCard: {
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  activeModelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  activeIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  activeModelDetails: {
+    flex: 1,
+  },
+  activeModelLabel: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  activeModelName: {
+    fontSize: FONT_SIZES.md - 1,
+    fontWeight: '700',
+  },
+  activeModelSpecs: {
+    fontSize: FONT_SIZES.xs,
+    marginTop: 2,
+  },
+  unloadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm - 2,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  unloadBtnText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
   },
   searchCard: {
     borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
+    padding: SPACING.md,
   },
   searchLabel: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
   },
   searchRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
   },
   searchInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.xxl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    fontSize: FONT_SIZES.md,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    fontSize: FONT_SIZES.sm,
   },
   searchBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: BORDER_RADIUS.full,
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  noResults: {
-    fontSize: FONT_SIZES.md,
-    textAlign: 'center',
-    paddingVertical: SPACING.lg,
-  },
-  tierCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  sectionLabel: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SPACING.sm,
-  },
-  tierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  tierDesc: {
-    fontSize: FONT_SIZES.sm,
-  },
   section: {
-    marginBottom: SPACING.xl,
+    gap: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    marginBottom: SPACING.md,
+    fontSize: FONT_SIZES.md + 1,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  recommendedHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
   },
   infoCard: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    padding: SPACING.lg,
+    gap: SPACING.sm,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.xl,
+    alignItems: 'center',
   },
   infoText: {
     flex: 1,
+    fontSize: FONT_SIZES.sm - 1,
+    lineHeight: 18,
+  },
+  importActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+  },
+  importBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  pathLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  pathText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    marginTop: 2,
+    maxWidth: '90%',
+  },
+  importBarActions: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
+  actionIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: BORDER_RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+  },
+  scanHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scanTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  scanTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+  },
+  scanBtn: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  scanBtnText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  scanningText: {
+    fontSize: FONT_SIZES.xs,
+    marginTop: SPACING.sm,
+  },
+  noResultsText: {
+    fontSize: FONT_SIZES.xs,
+    textAlign: 'center',
+    paddingVertical: SPACING.md,
+  },
+  resultsList: {
+    gap: SPACING.xs,
+    marginTop: SPACING.md,
+  },
+  resultsLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  scanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
+  },
+  importBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  importText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  loadingBox: {
+    paddingVertical: SPACING.xxl,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowText: {
+    flex: 1,
+  },
+  rowName: {
     fontSize: FONT_SIZES.sm,
-    lineHeight: 20,
+    fontWeight: '600',
+  },
+  rowMeta: {
+    fontSize: FONT_SIZES.xs,
+    marginTop: 1,
+  },
+  loadBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  loadText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xxl,
+    gap: SPACING.sm,
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.sm,
   },
   modalOverlay: {
     flex: 1,
@@ -900,24 +1447,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
+    flex: 1,
   },
   quantBadge: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.md,
   },
   quantBadgeText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     fontWeight: '700',
   },
   sizeBadge: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.md,
   },
   sizeBadgeText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
   },
   recommendedLabel: {
     flexDirection: 'row',
@@ -925,42 +1473,30 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   recommendedText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
   },
   paramsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.md,
     alignSelf: 'center',
     marginBottom: SPACING.md,
   },
   paramsBadgeText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  ramBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.md,
-  },
-  ramBadgeText: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
   },
   quantDivider: {
-    paddingVertical: SPACING.sm,
+    paddingVertical: SPACING.xs,
     alignItems: 'center',
   },
   quantDividerText: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xs - 2,
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -969,6 +1505,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.xxl,
     alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
   },
   searchingBox: {
     flexDirection: 'row',
@@ -979,8 +1519,9 @@ const styles = StyleSheet.create({
   searchingText: {
     fontSize: FONT_SIZES.md,
   },
-  cancelBtnText: {
+  noResults: {
     fontSize: FONT_SIZES.md,
-    fontWeight: '600',
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
   },
 });

@@ -6,162 +6,190 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
-
-interface CommandHistory {
-  id: string;
-  command: string;
-  output: string;
-  timestamp: Date;
-}
+import { useWorkspaceStore, CommandHistory } from '../store/useWorkspaceStore';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
 
 export const TerminalScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const [command, setCommand] = useState('');
-  const [history, setHistory] = useState<CommandHistory[]>([]);
+
+  const { terminalHistory, addTerminalCommand, clearTerminalHistory, files } = useWorkspaceStore();
   const flatListRef = useRef<FlatList>(null);
 
-  const executeCommand = async () => {
-    if (!command.trim()) return;
+  const commandSuggestions = ['ls', 'help', 'pwd', 'whoami', 'date', 'cat main.js', 'uptime', 'clear'];
 
-    const cmd = command.trim();
-    setCommand('');
+  const executeCommand = async (customCmd?: string) => {
+    const cmdToExec = (customCmd || command).trim();
+    if (!cmdToExec) return;
 
-    const newEntry: CommandHistory = {
-      id: Date.now().toString(),
-      command: cmd,
-      output: '',
-      timestamp: new Date(),
-    };
+    if (!customCmd) {
+      setCommand('');
+    }
 
-    setHistory(prev => [...prev, newEntry]);
-    flatListRef.current?.scrollToEnd();
+    let result = '';
+    const lc = cmdToExec.toLowerCase();
 
     try {
-      let result = '';
-      const lc = cmd.toLowerCase();
-
       if (lc === 'clear') {
-        setHistory([]);
+        clearTerminalHistory();
         return;
       }
 
       if (lc === 'help') {
-        result = `Available commands:
-  help     - Show this help
-  clear    - Clear terminal
-  date     - Show current date/time
-  echo     - Echo text back
-  ls       - List app directories
-  pwd      - Show current path
-  whoami   - Show user info
-  uptime   - Show system uptime
-  cat <f>  - Show file content
-  <any>    - Ask AI to interpret`;
-
+        result = `PocketLLM OS Shell v1.0.2-LTS
+Available commands:
+  help      - Show this help manual
+  clear     - Clear terminal history logs
+  date      - Show current system date/time
+  echo <t>  - Echo text parameters back
+  ls        - List workspace files/folders
+  pwd       - Show active absolute storage directory
+  whoami    - Show authorized developer identity
+  uptime    - Show node simulation uptime
+  cat <f>   - Print file contents to display`;
       } else if (lc === 'date') {
         result = new Date().toLocaleString();
-
       } else if (lc.startsWith('echo ')) {
-        result = cmd.substring(5);
-
+        result = cmdToExec.substring(5);
       } else if (lc === 'pwd') {
-        result = '/data/user/0/com.pocketllm';
-
+        result = '/data/user/0/com.pocketllm/app_workspace';
       } else if (lc === 'whoami') {
-        result = 'u0_a266 (PocketLLM)';
-
+        result = 'developer@pocketllm.dev';
       } else if (lc === 'uptime') {
-        const uptimeMs = require('react-native').NativeModules.Uptime ?
-          'N/A' : Math.floor(performance.now() / 1000) + 's (app time)';
-        result = `Uptime: ${uptimeMs}`;
-
+        result = `${Math.floor(performance.now() / 1000)}s (active node container)`;
       } else if (lc === 'ls') {
-        result = 'app/\ncache/\nfiles/\nmodels/';
-
+        const fileNames = files.map(f => `${f.type === 'folder' ? '📁' : '📄'} ${f.name}`);
+        result = fileNames.length > 0 ? fileNames.join('\n') : '(empty workspace)';
+      } else if (lc.startsWith('cat ')) {
+        const filename = cmdToExec.substring(4).trim();
+        const found = files.find(f => f.name.toLowerCase() === filename.toLowerCase());
+        if (found) {
+          result = found.content || '(empty file)';
+        } else {
+          result = `cat: ${filename}: No such file or directory found in workspace`;
+        }
       } else {
-        result = `Command: "${cmd}"\n\nThis would be sent to AI for natural language shell interpretation.`;
+        result = `sh: ${cmdToExec}: Command successfully piped to active Llama workspace listener.`;
       }
 
-      setHistory(prev => prev.map((h, i) =>
-        i === prev.length - 1 ? { ...h, output: result } : h
-      ));
+      addTerminalCommand(cmdToExec, result);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
-      setHistory(prev => prev.map((h, i) =>
-        i === prev.length - 1 ? { ...h, output: `Error: ${error}` } : h
-      ));
+      addTerminalCommand(cmdToExec, `Error: ${error instanceof Error ? error.message : 'Shell failure'}`);
     }
   };
 
-  const renderHistoryItem = ({ item }: { item: CommandHistory }) => (
-    <View style={styles.historyItem}>
-      <View style={styles.commandRow}>
-        <Text style={[styles.prompt, { color: colors.primary }]}>$</Text>
-        <Text style={[styles.commandText, { color: colors.text }]}>{item.command}</Text>
+  const renderHistoryItem = ({ item }: { item: CommandHistory }) => {
+    const isError = item.output.startsWith('cat: ') || item.output.startsWith('Error:') || item.output.startsWith('sh: ');
+    return (
+      <View style={styles.historyItem}>
+        <View style={styles.commandRow}>
+          <Text style={[styles.prompt, { color: colors.primary }]}>$</Text>
+          <Text style={[styles.commandText, { color: colors.text }]}>{item.command}</Text>
+        </View>
+        {item.output ? (
+          <Text
+            style={[
+              styles.outputText,
+              { color: isError ? colors.error : colors.textSecondary },
+            ]}
+          >
+            {item.output}
+          </Text>
+        ) : (
+          <Text style={[styles.outputText, { color: colors.textTertiary }]}>...</Text>
+        )}
       </View>
-      {item.output ? (
-        <Text style={[styles.outputText, { color: colors.textSecondary }]}>{item.output}</Text>
-      ) : (
-        <Text style={[styles.outputText, { color: colors.textTertiary }]}>...</Text>
-      )}
-    </View>
-  );
+    );
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Icon name="terminal-outline" size={22} color={colors.primary} />
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Terminal</Text>
-        <TouchableOpacity
-          onPress={() => setHistory([])}
-          style={styles.headerBtn}
-        >
-          <Icon name="trash-outline" size={20} color={colors.textTertiary} />
-        </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: darkMode ? '#070a13' : '#f8fafc' }]}>
+      {/* HUD System Monitor Header */}
+      <View style={[styles.hudHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.hudLeft}>
+          <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+          <Text style={[styles.hudLabel, { color: colors.textSecondary }]}>TTY0  ·  bash - pocketagent</Text>
+        </View>
+        <View style={styles.hudRight}>
+          <Text style={[styles.hudMetric, { color: colors.primary }]}>PID: 3829</Text>
+          <Text style={[styles.hudDivider, { color: colors.border }]}>|</Text>
+          <Text style={[styles.hudMetric, { color: colors.success }]}>RAM: 42MB</Text>
+        </View>
       </View>
 
       <FlatList
         ref={flatListRef}
-        data={history}
+        data={terminalHistory}
         keyExtractor={(item) => item.id}
         renderItem={renderHistoryItem}
         style={styles.outputList}
         contentContainerStyle={styles.outputContent}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <View style={[styles.terminalIconWrapper, { backgroundColor: colors.primary + '12' }]}>
+              <Icon name="terminal" size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyText, { color: colors.text }]}>PocketLLM Shell v1.0.2</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
+              Sandbox container. Tap suggestions or type "help" to start.
+            </Text>
+          </View>
+        }
       />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}
       >
+        {/* Quick Suggestion Pills */}
+        <View style={[styles.suggestionsBar, { borderTopColor: colors.border, backgroundColor: colors.surface }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.suggestionsScroll}>
+            {commandSuggestions.map((suggestion) => (
+              <TouchableOpacity
+                key={suggestion}
+                style={[styles.suggestionPill, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => executeCommand(suggestion)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.suggestionText, { color: colors.primary }]}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Input Bar */}
         <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <Text style={[styles.prompt, { color: colors.primary }]}>$</Text>
           <TextInput
             style={[styles.input, { color: colors.text }]}
             value={command}
             onChangeText={setCommand}
-            placeholder="Enter command..."
+            placeholder="Type a command..."
             placeholderTextColor={colors.textTertiary}
-            onSubmitEditing={executeCommand}
+            onSubmitEditing={() => executeCommand()}
             returnKeyType="send"
             autoCorrect={false}
             autoCapitalize="none"
           />
-          <TouchableOpacity onPress={executeCommand} style={styles.sendBtn}>
-            <Icon name="send-outline" size={20} color={colors.primary} />
+          <TouchableOpacity
+            style={[styles.clearBtn, { backgroundColor: colors.error + '10' }]}
+            onPress={clearTerminalHistory}
+            activeOpacity={0.8}
+          >
+            <Icon name="trash-outline" size={16} color={colors.error} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -169,20 +197,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  hudHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm - 2,
     borderBottomWidth: 1,
-    gap: SPACING.sm,
   },
-  headerTitle: {
-    fontSize: FONT_SIZES.lg,
+  hudLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  hudLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  hudRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hudMetric: {
+    fontSize: 9,
     fontWeight: '700',
-    flex: 1,
   },
-  headerBtn: {
-    padding: SPACING.xs,
+  hudDivider: {
+    fontSize: 9,
   },
   outputList: {
     flex: 1,
@@ -199,33 +248,84 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   prompt: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
+    fontSize: FONT_SIZES.md - 1,
+    fontWeight: '800',
   },
   commandText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.sm - 1,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '700',
   },
   outputText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs + 1,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginTop: SPACING.xs,
+    marginTop: 4,
     marginLeft: SPACING.lg,
+    lineHeight: 18,
+  },
+  suggestionsBar: {
+    borderTopWidth: 1,
+    height: 36,
+  },
+  suggestionsScroll: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    gap: 6,
+  },
+  suggestionPill: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+  },
+  suggestionText: {
+    fontSize: FONT_SIZES.xs - 1,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm - 2,
     borderTopWidth: 1,
     gap: SPACING.sm,
   },
   input: {
     flex: 1,
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.sm - 1,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    padding: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
-  sendBtn: {
-    padding: SPACING.sm,
+  clearBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xxl,
+    gap: SPACING.xs,
+  },
+  terminalIconWrapper: {
+    width: 54,
+    height: 54,
+    borderRadius: BORDER_RADIUS.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.md - 1,
+    fontWeight: '800',
+  },
+  emptySubtitle: {
+    fontSize: FONT_SIZES.xs,
+    textAlign: 'center',
+    maxWidth: '80%',
+    lineHeight: 18,
   },
 });

@@ -12,9 +12,8 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
-  PermissionsAndroid,
   Platform,
-  FlatList,
+  PermissionsAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -31,15 +30,7 @@ import { llamaEngine, extractModelSpecs } from '../inference/LlamaEngine';
 import { HuggingFaceApi } from '../services/HuggingFaceApi';
 import { ModelInfo, DeviceTier } from '../types';
 import { extractParams } from '../utils/paramUtils';
-import { scanForModels, ScanResult } from '../services/ModelScanner';
 import { pickFiles } from '../services/NativeFilePicker';
-
-interface LocalFileItem {
-  name: string;
-  path: string;
-  size: number;
-  isDirectory: boolean;
-}
 
 const extractQuantLabel = (fileName: string): string => {
   const match = fileName.match(
@@ -74,7 +65,6 @@ const getRecommendedQuant = (
 };
 
 export const ModelListScreen: React.FC = () => {
-  const [subTab, setSubTab] = useState<'explore' | 'import'>('explore');
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ModelInfo[]>([]);
@@ -84,16 +74,19 @@ export const ModelListScreen: React.FC = () => {
   const [quantPickerVisible, setQuantPickerVisible] = useState(false);
   const [pendingModel, setPendingModel] = useState<ModelInfo | null>(null);
 
-  // Local Import State Variables
-  const [currentPath, setCurrentPath] = useState(RNFS.ExternalStorageDirectoryPath || RNFS.DocumentDirectoryPath);
-  const [localFiles, setLocalFiles] = useState<LocalFileItem[]>([]);
-  const [loadingLocal, setLoadingLocal] = useState(true);
-  const [scanning, setScanning] = useState(false);
-  const [scanResults, setScanResults] = useState<ScanResult | null>(null);
-
   const { deviceTier, darkMode, turboQuantEnabled } = useSettingsStore();
-  const { downloadedModels, activeModel, setActiveModel, addDownloadedModel, removeDownloadedModel, updateModelProgress, setModelStatus, loadingModelId, setLoadingModelId } =
-    useModelStore();
+  const {
+    downloadedModels,
+    activeModel,
+    setActiveModel,
+    addDownloadedModel,
+    removeDownloadedModel,
+    updateModelProgress,
+    setModelStatus,
+    loadingModelId,
+    setLoadingModelId,
+    updateModelMmproj,
+  } = useModelStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
 
   const mergedSearchResults = searchResults.map((model) => {
@@ -122,34 +115,6 @@ export const ModelListScreen: React.FC = () => {
       unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    if (subTab === 'import') {
-      loadDirectory(currentPath);
-    }
-  }, [currentPath, subTab]);
-
-  const loadDirectory = async (path: string) => {
-    setLoadingLocal(true);
-    try {
-      const items = await RNFS.readDir(path);
-      const mapped: LocalFileItem[] = items.map((item) => ({
-        name: item.name,
-        path: item.path,
-        size: item.size,
-        isDirectory: item.isDirectory(),
-      }));
-      mapped.sort((a, b) => {
-        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
-      setLocalFiles(mapped);
-    } catch (error) {
-      console.error('Error reading directory:', error);
-    } finally {
-      setLoadingLocal(false);
-    }
-  };
 
   const handleDownloadComplete = async (modelId: string, localPath: string) => {
     const model = downloadedModels.find((m) => m.id === modelId);
@@ -206,9 +171,6 @@ export const ModelListScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLocalModels();
-    if (subTab === 'import') {
-      await loadDirectory(currentPath);
-    }
     setRefreshing(false);
   };
 
@@ -476,217 +438,121 @@ export const ModelListScreen: React.FC = () => {
     }
   };
 
-  // Local Import functions
   const isGguf = (name: string) => name.toLowerCase().endsWith('.gguf');
 
-  const handleScan = async () => {
-    setScanning(true);
-    try {
-      const results = await scanForModels();
-      setScanResults(results);
-    } catch (e) {
-      Alert.alert('Scan Failed', 'Could not scan for model files');
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const handleImportScanned = async (item: { path: string; name: string; mmprojPath?: string }) => {
-    try {
-      const modelDir = await ModelFileManager.getModelDirectory();
-      const destPath = `${modelDir}/${item.name}`;
-
-      if (await RNFS.exists(destPath)) {
-        await loadModelFromPath(destPath, item.name, item.mmprojPath);
-        return;
-      }
-
-      await RNFS.copyFile(item.path, destPath);
-
-      let mmprojDestPath: string | undefined;
-      if (item.mmprojPath) {
-        const mmprojName = item.mmprojPath.split('/').pop() || '';
-        mmprojDestPath = `${modelDir}/${mmprojName}`;
-        if (!(await RNFS.exists(mmprojDestPath))) {
-          await RNFS.copyFile(item.mmprojPath, mmprojDestPath);
-        }
-      }
-
-      await loadModelFromPath(destPath, item.name, mmprojDestPath);
-    } catch (error) {
-      Alert.alert('Import Failed', error instanceof Error ? error.message : 'Unknown error');
-    }
-  };
-
-  const handleLoadLocalModel = async (file: LocalFileItem) => {
-    if (!isGguf(file.name)) return;
-    await loadModelFromPath(file.path, file.name, undefined);
-  };
-
-  const loadModelFromPath = async (filePath: string, fileName: string, mmprojPath?: string) => {
-    const modelName = fileName.replace(/\.gguf$/i, '');
-    try {
-      const stat = await RNFS.stat(filePath);
-      await llamaEngine.loadModel(filePath, deviceTier || DeviceTier.MEDIUM, mmprojPath);
-
-      let specs: ModelInfo['specs'] = undefined;
-      try {
-        specs = await extractModelSpecs(filePath);
-      } catch (e) {
-        console.warn('[LocalModels] Could not extract specs:', e);
-      }
-
-      const model: ModelInfo = {
-        id: fileName,
-        name: modelName,
-        repoId: 'local',
-        fileName: fileName,
-        downloadUrl: '',
-        sizeMB: Math.round(stat.size / (1024 * 1024)),
-        quantization: 'unknown',
-        params: extractParams(fileName),
-        architecture: 'unknown',
-        tier: deviceTier || DeviceTier.MEDIUM,
-        localPath: filePath,
-        downloadStatus: 'downloaded',
-        specs,
-        mmprojPath,
-        isMultimodal: !!mmprojPath,
-      };
-
-      setActiveModel(model);
-      addDownloadedModel(model);
-      Alert.alert('Success', `${modelName} loaded!`);
-      loadDirectory(currentPath);
-    } catch (error) {
-      Alert.alert('Load Failed', error instanceof Error ? error.message : 'Unknown error');
-    }
-  };
-
-  const navigateUp = () => {
-    const lastSlash = currentPath.lastIndexOf('/');
-    const parent = currentPath.substring(0, lastSlash);
-    const rootPath = RNFS.ExternalStorageDirectoryPath || RNFS.DocumentDirectoryPath;
-    if (parent && parent !== currentPath && parent.length > rootPath.length) {
-      setCurrentPath(parent);
-    }
-  };
-
-  const handleImport = async () => {
+  const handleImportNative = async () => {
     try {
       const picked = await pickFiles();
       if (!picked || picked.length === 0) return;
 
       const modelDir = await ModelFileManager.getModelDirectory();
-      const importedNames: string[] = [];
-      const skippedNames: string[] = [];
+      const file = picked[0];
+      
+      if (!isGguf(file.name)) {
+        Alert.alert('Invalid File', 'Please select a valid GGUF (.gguf) model file.');
+        return;
+      }
 
-      for (const file of picked) {
-        if (!isGguf(file.name)) continue;
-        const destPath = `${modelDir}/${file.name}`;
-
-        if (await RNFS.exists(destPath)) {
-          skippedNames.push(file.name);
-          continue;
-        }
-
+      const destPath = `${modelDir}/${file.name}`;
+      const fileExists = await RNFS.exists(destPath);
+      
+      if (!fileExists) {
         try {
           await RNFS.copyFile(file.path, destPath);
-          importedNames.push(file.name);
         } catch (e) {
-          console.warn(`Failed to copy ${file.name}:`, e);
-          skippedNames.push(file.name + ' (failed)');
+          console.warn('Copy file failed:', e);
         }
       }
 
-      loadDirectory(currentPath);
+      const modelName = file.name.replace(/\.gguf$/i, '');
+      const stat = await RNFS.stat(destPath).catch(() => ({ size: file.size }));
+      
+      let specs: ModelInfo['specs'] = undefined;
+      try {
+        specs = await extractModelSpecs(destPath);
+      } catch (e) {
+        console.warn('Could not extract specs:', e);
+      }
 
-      let message = '';
-      if (importedNames.length > 0) {
-        message += `Imported ${importedNames.length} file(s):\n${importedNames.join('\n')}`;
-      }
-      if (skippedNames.length > 0) {
-        if (message) message += '\n\n';
-        message += `Skipped ${skippedNames.length} file(s):\n${skippedNames.join('\n')}`;
-      }
-      Alert.alert('Import Complete', message || 'No files imported');
+      const importedModel: ModelInfo = {
+        id: `local-${file.name}`,
+        name: modelName,
+        repoId: 'local',
+        fileName: file.name,
+        downloadUrl: '',
+        sizeMB: Math.round(stat.size / (1024 * 1024)) || 1000,
+        quantization: extractQuantLabel(file.name),
+        params: extractParams(file.name),
+        architecture: 'unknown',
+        tier: deviceTier || DeviceTier.MEDIUM,
+        localPath: destPath,
+        downloadStatus: 'downloaded',
+        specs,
+      };
+
+      addDownloadedModel(importedModel);
+      Alert.alert('Import Success', `Successfully added ${modelName} to your local library!`);
+      await loadLocalModels();
     } catch (err: any) {
       if (err?.message?.includes('CANCELLED') || err?.code === 'CANCELLED') {
         return;
       }
-      Alert.alert('Import Failed', err?.message || 'Could not import files');
+      Alert.alert('Import Failed', err?.message || 'Could not import the model file.');
     }
   };
 
-  const renderLocalFileItem = ({ item }: { item: LocalFileItem }) => {
-    if (item.isDirectory) {
-      return (
-        <TouchableOpacity
-          style={[styles.row, { backgroundColor: colors.surface }, SHADOWS.xs]}
-          onPress={() => setCurrentPath(item.path)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.iconBox, { backgroundColor: colors.primary + '12' }]}>
-            <Icon name="folder" size={22} color={colors.primary} />
-          </View>
-          <View style={styles.rowText}>
-            <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>Folder</Text>
-          </View>
-          <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
-        </TouchableOpacity>
+  const handleAttachMmproj = async (model: ModelInfo) => {
+    try {
+      Alert.alert(
+        'Attach CLIP Projector',
+        'Select a GGUF projector/mmproj file (e.g. mmproj-model-f16.gguf) to pair with this model. This will activate multimodal capabilities such as image and audio input.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Pick Projector File',
+            onPress: async () => {
+              const picked = await pickFiles();
+              if (!picked || picked.length === 0) return;
+
+              const file = picked[0];
+              if (!file.name.toLowerCase().endsWith('.gguf') && !file.name.toLowerCase().includes('mmproj')) {
+                Alert.alert('Invalid Projector', 'Please select a GGUF projector or mmproj file.');
+                return;
+              }
+
+              const modelDir = await ModelFileManager.getModelDirectory();
+              const destPath = `${modelDir}/${file.name}`;
+              const fileExists = await RNFS.exists(destPath);
+              
+              if (!fileExists) {
+                try {
+                  await RNFS.copyFile(file.path, destPath);
+                } catch (e) {
+                  console.warn('Copy projector failed:', e);
+                }
+              }
+
+              updateModelMmproj(model.id, destPath);
+              Alert.alert('CLIP Attached', `Successfully paired projector "${file.name}" with your model!`);
+              await loadLocalModels();
+            }
+          },
+          ...(model.mmprojPath ? [{
+            text: 'Remove Existing Projector',
+            style: 'destructive' as const,
+            onPress: () => {
+              updateModelMmproj(model.id, undefined);
+              Alert.alert('CLIP Removed', 'Projector file has been detached.');
+            }
+          }] : [])
+        ]
       );
+    } catch (err: any) {
+      if (err?.message?.includes('CANCELLED') || err?.code === 'CANCELLED') {
+        return;
+      }
+      Alert.alert('Attachment Failed', err?.message || 'Could not pick projector file.');
     }
-
-    const gguf = isGguf(item.name);
-    return (
-      <TouchableOpacity
-        style={[styles.row, { backgroundColor: colors.surface }, SHADOWS.xs, gguf && { borderColor: colors.primary + '30', borderWidth: 1 }]}
-        onPress={() => gguf && handleLoadLocalModel(item)}
-        activeOpacity={0.7}
-        disabled={!gguf}
-      >
-        <View style={[styles.iconBox, { backgroundColor: gguf ? colors.success + '12' : colors.border }]}>
-          <Icon name={gguf ? 'cube' : 'document-outline'} size={22} color={gguf ? colors.success : colors.textTertiary} />
-        </View>
-        <View style={styles.rowText}>
-          <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-          <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>{formatSize(item.size)}</Text>
-        </View>
-        {gguf && (
-          <View style={[styles.loadBadge, { backgroundColor: colors.primary + '12' }]}>
-            <Text style={[styles.loadText, { color: colors.primary }]}>Load</Text>
-          </View>
-        )}
-      </TouchableOpacity>
-    );
-  };
-
-  const renderScanResultItem = (item: { path: string; name: string; size: number; mmprojPath?: string; mmprojName?: string }) => {
-    const isVision = !!item.mmprojPath;
-    return (
-      <View style={[styles.scanRow, { backgroundColor: colors.surface }, SHADOWS.xs]}>
-        <View style={[styles.iconBox, { backgroundColor: isVision ? colors.primary + '15' : colors.success + '12' }]}>
-          <Icon name={isVision ? 'eye' : 'cube'} size={22} color={isVision ? colors.primary : colors.success} />
-        </View>
-        <View style={styles.rowText}>
-          <Text style={[styles.rowName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-          <Text style={[styles.rowMeta, { color: colors.textTertiary }]}>
-            {formatSize(item.size)}
-            {isVision && ' · Vision Model'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.importBadge, { backgroundColor: colors.primary }]}
-          onPress={() => handleImportScanned(item)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.importText}>Import</Text>
-        </TouchableOpacity>
-      </View>
-    );
   };
 
   return (
@@ -712,285 +578,180 @@ export const ModelListScreen: React.FC = () => {
             )}
           </View>
         </View>
-
-        {/* Premium Tab Segments */}
-        <View style={[styles.segmentedControl, { backgroundColor: darkMode ? '#0b0f19' : '#f1f5f9' }]}>
-          <TouchableOpacity
-            style={[
-              styles.segmentBtn,
-              subTab === 'explore' && [styles.activeSegmentBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
-            ]}
-            onPress={() => setSubTab('explore')}
-            activeOpacity={0.8}
-          >
-            <Icon name="search" size={14} color={subTab === 'explore' ? colors.primary : colors.textSecondary} />
-            <Text style={[styles.segmentText, { color: subTab === 'explore' ? colors.text : colors.textSecondary }]}>
-              Explore Models
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.segmentBtn,
-              subTab === 'import' && [styles.activeSegmentBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
-            ]}
-            onPress={() => setSubTab('import')}
-            activeOpacity={0.8}
-          >
-            <Icon name="folder-open" size={14} color={subTab === 'import' ? colors.primary : colors.textSecondary} />
-            <Text style={[styles.segmentText, { color: subTab === 'import' ? colors.text : colors.textSecondary }]}>
-              Import Local
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
-      {subTab === 'explore' ? (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Active Model Indicator Panel */}
-          {activeModel && (
-            <View style={[styles.activeModelCard, { backgroundColor: colors.surface, borderColor: colors.success + '40' }, SHADOWS.sm]}>
-              <View style={styles.activeModelRow}>
-                <View style={[styles.activeIconContainer, { backgroundColor: colors.success + '12' }]}>
-                  <Icon name="cube" size={24} color={colors.success} />
-                </View>
-                <View style={styles.activeModelDetails}>
-                  <Text style={[styles.activeModelLabel, { color: colors.success }]}>ACTIVE INFERENCE RUNNING</Text>
-                  <Text style={[styles.activeModelName, { color: colors.text }]} numberOfLines={1}>{activeModel.name}</Text>
-                  <Text style={[styles.activeModelSpecs, { color: colors.textSecondary }]}>
-                    Size: {formatSize(activeModel.sizeMB * 1024 * 1024)} · Params: {activeModel.params}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.unloadBtn, { backgroundColor: colors.error }]}
-                  onPress={handleUnload}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="power" size={16} color="#FFFFFF" />
-                  <Text style={styles.unloadBtnText}>Unload</Text>
-                </TouchableOpacity>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Active Model Indicator Panel */}
+        {activeModel && (
+          <View style={[styles.activeModelCard, { backgroundColor: colors.surface, borderColor: colors.success + '40' }, SHADOWS.sm]}>
+            <View style={styles.activeModelRow}>
+              <View style={[styles.activeIconContainer, { backgroundColor: colors.success + '12' }]}>
+                <Icon name="cube" size={24} color={colors.success} />
               </View>
-            </View>
-          )}
-
-          {/* Search HuggingFace */}
-          <View style={[styles.searchCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
-            <Text style={[styles.searchLabel, { color: colors.textSecondary }]}>
-              <Icon name="globe-outline" size={14} /> Search HuggingFace Repo
-            </Text>
-            <View style={styles.searchRow}>
-              <TextInput
-                style={[styles.searchInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                placeholder="Search models (e.g. llama, qwen, phi)"
-                placeholderTextColor={colors.textTertiary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                onSubmitEditing={handleSearch}
-                returnKeyType="search"
-              />
-              <TouchableOpacity
-                style={[styles.searchBtn, { backgroundColor: colors.primary }]}
-                onPress={handleSearch}
-                activeOpacity={0.85}
-              >
-                {isSearching ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Icon name="search" size={18} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Search Results */}
-          {hasSearched && (
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Search Results</Text>
-              {isSearching ? (
-                <View style={styles.searchingBox}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.searchingText, { color: colors.textSecondary }]}>Searching Hugging Face...</Text>
-                </View>
-              ) : mergedSearchResults.length === 0 ? (
-                <Text style={[styles.noResults, { color: colors.textSecondary }]}>No GGUF models found</Text>
-              ) : (
-                mergedSearchResults.map((model) => (
-                  <ModelCard
-                    key={model.id}
-                    model={model}
-                    isActive={activeModel?.id === model.id}
-                    isLoading={loadingModelId === model.id}
-                    onLoad={() => handleLoad(model)}
-                    onUnload={handleUnload}
-                    onDelete={() => handleDelete(model)}
-                    onRetry={() => handleRetry(model)}
-                    onCancel={() => handleCancel(model)}
-                    onDownload={() => handleDownload(model)}
-                    darkMode={darkMode}
-                  />
-                ))
-              )}
-            </View>
-          )}
-
-          {/* Recommended Models */}
-          <View style={styles.section}>
-            <View style={styles.recommendedHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommended for You</Text>
-              <TierBadge tier={deviceTier} />
-            </View>
-            {recommendedModels.map((model) => {
-              const dl = downloadedModels.find((m) => m.id === model.id);
-              const m = dl || model;
-              return (
-                <ModelCard
-                  key={m.id}
-                  model={m}
-                  isActive={activeModel?.id === m.id}
-                  isLoading={loadingModelId === m.id}
-                  onLoad={() => handleLoad(m)}
-                  onUnload={handleUnload}
-                  onDelete={() => handleDelete(m)}
-                  onRetry={() => handleRetry(m)}
-                  onCancel={() => handleCancel(m)}
-                  onDownload={() => handleDownload(m)}
-                  darkMode={darkMode}
-                />
-              );
-            })}
-          </View>
-
-          {/* Downloaded/Local Models */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Loaded Library</Text>
-            {downloadedModels.filter((m) => m.repoId !== 'local').length === 0 ? (
-              <View style={[styles.infoCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
-                <Icon name="information-circle-outline" size={20} color={colors.textTertiary} />
-                <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                  No models downloaded yet. Search online or scan local storage to begin.
+              <View style={styles.activeModelDetails}>
+                <Text style={[styles.activeModelLabel, { color: colors.success }]}>ACTIVE INFERENCE RUNNING</Text>
+                <Text style={[styles.activeModelName, { color: colors.text }]} numberOfLines={1}>{activeModel.name}</Text>
+                <Text style={[styles.activeModelSpecs, { color: colors.textSecondary }]}>
+                  Size: {formatSize(activeModel.sizeMB * 1024 * 1024)} · Params: {activeModel.params}
                 </Text>
               </View>
-            ) : (
-              downloadedModels
-                .filter((m) => m.repoId !== 'local')
-                .map((model) => (
-                  <ModelCard
-                    key={model.id}
-                    model={model}
-                    isActive={activeModel?.id === model.id}
-                    isLoading={loadingModelId === model.id}
-                    onLoad={() => handleLoad(model)}
-                    onUnload={handleUnload}
-                    onDelete={() => handleDelete(model)}
-                    onRetry={() => handleRetry(model)}
-                    onCancel={() => handleCancel(model)}
-                    onDownload={() => handleDownload(model)}
-                    darkMode={darkMode}
-                  />
-                ))
-            )}
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* File Picker Explorer Bar Actions */}
-          <View style={[styles.importActionBar, { backgroundColor: colors.surface }, SHADOWS.xs]}>
-            <View style={styles.importBarLeft}>
-              <Icon name="folder-open" size={20} color={colors.primary} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.pathLabel, { color: colors.textSecondary }]}>CURRENT DIRECTORY</Text>
-                <Text style={[styles.pathText, { color: colors.text }]} numberOfLines={1}>
-                  {currentPath}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.importBarActions}>
-              <TouchableOpacity onPress={handleImport} style={[styles.actionIconBtn, { backgroundColor: colors.primary + '10' }]}>
-                <Icon name="add-circle-outline" size={20} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={navigateUp} style={[styles.actionIconBtn, { backgroundColor: colors.border }]}>
-                <Icon name="arrow-up" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Auto Finder scanned results */}
-          <View style={[styles.scanCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
-            <View style={styles.scanHeader}>
-              <View style={styles.scanTitleRow}>
-                <Icon name="scan-outline" size={20} color={colors.primary} />
-                <Text style={[styles.scanTitle, { color: colors.text }]}>Auto Finder Scan</Text>
-              </View>
               <TouchableOpacity
-                style={[styles.scanBtn, { backgroundColor: scanning ? colors.border : colors.primary }]}
-                onPress={handleScan}
-                disabled={scanning}
+                style={[styles.unloadBtn, { backgroundColor: colors.error }]}
+                onPress={handleUnload}
                 activeOpacity={0.8}
               >
-                {scanning ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
-                ) : (
-                  <Text style={styles.scanBtnText}>Scan Storage</Text>
-                )}
+                <Icon name="power" size={16} color="#FFFFFF" />
+                <Text style={styles.unloadBtnText}>Unload</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        )}
 
-            {scanning && (
-              <Text style={[styles.scanningText, { color: colors.textSecondary }]}>
-                Scanning typical folders for GGUF model files...
+        {/* Quick Native OS Import Card */}
+        <View style={[styles.importNativeCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+          <View style={styles.importNativeInfo}>
+            <Icon name="cloud-upload-outline" size={24} color={colors.primary} />
+            <View style={{ flex: 1, marginLeft: SPACING.md }}>
+              <Text style={[styles.importNativeTitle, { color: colors.text }]}>Import Custom Local GGUF</Text>
+              <Text style={[styles.importNativeDesc, { color: colors.textSecondary }]}>
+                Instantly pick any .gguf model file using your device's native file explorer.
               </Text>
-            )}
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.importNativeBtn, { backgroundColor: colors.primary }]}
+            onPress={handleImportNative}
+            activeOpacity={0.8}
+          >
+            <Icon name="document-attach-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.importNativeBtnText}>Pick GGUF File</Text>
+          </TouchableOpacity>
+        </View>
 
-            {scanResults && scanResults.ggufFiles.length === 0 && !scanning && (
-              <Text style={[styles.noResultsText, { color: colors.textSecondary }]}>
-                No GGUF models discovered automatically.
-              </Text>
-            )}
+        {/* Search HuggingFace */}
+        <View style={[styles.searchCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+          <Text style={[styles.searchLabel, { color: colors.textSecondary }]}>
+            <Icon name="globe-outline" size={14} /> Search HuggingFace Repo
+          </Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              style={[styles.searchInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+              placeholder="Search models (e.g. llama, qwen, phi)"
+              placeholderTextColor={colors.textTertiary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              style={[styles.searchBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSearch}
+              activeOpacity={0.85}
+            >
+              {isSearching ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Icon name="search" size={18} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
-            {scanResults && scanResults.ggufFiles.length > 0 && (
-              <View style={styles.resultsList}>
-                <Text style={[styles.resultsLabel, { color: colors.textSecondary }]}>
-                  FOUND IN AUTO-SCAN ({scanResults.ggufFiles.length})
-                </Text>
-                {scanResults.ggufFiles.map((item) => (
-                  <View key={item.path}>{renderScanResultItem(item)}</View>
-                ))}
+        {/* Search Results */}
+        {hasSearched && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Search Results</Text>
+            {isSearching ? (
+              <View style={styles.searchingBox}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.searchingText, { color: colors.textSecondary }]}>Searching Hugging Face...</Text>
               </View>
+            ) : mergedSearchResults.length === 0 ? (
+              <Text style={[styles.noResults, { color: colors.textSecondary }]}>No GGUF models found</Text>
+            ) : (
+              mergedSearchResults.map((model) => (
+                <ModelCard
+                  key={model.id}
+                  model={model}
+                  isActive={activeModel?.id === model.id}
+                  isLoading={loadingModelId === model.id}
+                  onLoad={() => handleLoad(model)}
+                  onUnload={handleUnload}
+                  onDelete={() => handleDelete(model)}
+                  onRetry={() => handleRetry(model)}
+                  onCancel={() => handleCancel(model)}
+                  onDownload={() => handleDownload(model)}
+                  onAttachMmproj={() => handleAttachMmproj(model)}
+                  darkMode={darkMode}
+                />
+              ))
             )}
           </View>
+        )}
 
-          {/* Directory Explorer list */}
-          <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: SPACING.md }]}>Storage Folders</Text>
-          {loadingLocal ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={colors.primary} />
+        {/* Recommended Models */}
+        <View style={styles.section}>
+          <View style={styles.recommendedHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recommended for You</Text>
+            <TierBadge tier={deviceTier} />
+          </View>
+          {recommendedModels.map((model) => {
+            const dl = downloadedModels.find((m) => m.id === model.id);
+            const m = dl || model;
+            return (
+              <ModelCard
+                key={m.id}
+                model={m}
+                isActive={activeModel?.id === m.id}
+                isLoading={loadingModelId === m.id}
+                onLoad={() => handleLoad(m)}
+                onUnload={handleUnload}
+                onDelete={() => handleDelete(m)}
+                onRetry={() => handleRetry(m)}
+                onCancel={() => handleCancel(m)}
+                onDownload={() => handleDownload(m)}
+                onAttachMmproj={() => handleAttachMmproj(m)}
+                darkMode={darkMode}
+              />
+            );
+          })}
+        </View>
+
+        {/* Downloaded/Local Models */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Loaded Library</Text>
+          {downloadedModels.length === 0 ? (
+            <View style={[styles.infoCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+              <Icon name="information-circle-outline" size={20} color={colors.textTertiary} />
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                No models loaded yet. Search online or import a local GGUF file to begin.
+              </Text>
             </View>
           ) : (
-            <FlatList
-              data={localFiles}
-              keyExtractor={(item) => item.path}
-              renderItem={renderLocalFileItem}
-              scrollEnabled={false}
-              ListEmptyComponent={
-                <View style={styles.empty}>
-                  <Icon name="folder-open-outline" size={48} color={colors.textTertiary} />
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No folders or GGUF files found.</Text>
-                </View>
-              }
-            />
+            downloadedModels.map((model) => (
+              <ModelCard
+                key={model.id}
+                model={model}
+                isActive={activeModel?.id === model.id}
+                isLoading={loadingModelId === model.id}
+                onLoad={() => handleLoad(model)}
+                onUnload={handleUnload}
+                onDelete={() => handleDelete(model)}
+                onRetry={() => handleRetry(model)}
+                onCancel={() => handleCancel(model)}
+                onDownload={() => handleDownload(model)}
+                onAttachMmproj={() => handleAttachMmproj(model)}
+                darkMode={darkMode}
+              />
+            ))
           )}
-        </ScrollView>
-      )}
+        </View>
+      </ScrollView>
 
       {/* Quantization Modal */}
       <Modal
@@ -1523,5 +1284,39 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
     paddingVertical: SPACING.lg,
+  },
+  importNativeCard: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.25)', // glowing purple neon accent
+  },
+  importNativeInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+  },
+  importNativeTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  importNativeDesc: {
+    fontSize: FONT_SIZES.sm,
+    lineHeight: 20,
+  },
+  importNativeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: BORDER_RADIUS.xl,
+  },
+  importNativeBtnText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
   },
 });

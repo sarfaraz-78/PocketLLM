@@ -43,8 +43,20 @@ export const IdeScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
 
-  const { files, activeFileId, addFile, updateFileContent, deleteFile, setActiveFileId, terminalHistory } =
-    useWorkspaceStore();
+  const {
+    files,
+    activeFileId,
+    addFile,
+    updateFileContent,
+    deleteFile,
+    setActiveFileId,
+    terminalHistory,
+    workspaces,
+    activeWorkspaceId,
+    createWorkspace,
+    switchWorkspace,
+    deleteWorkspace,
+  } = useWorkspaceStore();
 
   const [showExplorer, setShowExplorer] = useState(true);
   const [newFileName, setNewFileName] = useState('');
@@ -153,6 +165,60 @@ export const IdeScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Workspace Selector Bar */}
+      <View style={[styles.workspaceSelectorBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.workspaceInfo}>
+          <Icon name="folder-open" size={16} color={colors.primary} />
+          <Text style={[styles.workspaceLabel, { color: colors.textSecondary }]}>Project:</Text>
+          <Text style={[styles.workspaceName, { color: colors.text }]}>
+            {workspaces.find(w => w.id === activeWorkspaceId)?.name || 'Default Project'}
+          </Text>
+        </View>
+        <View style={styles.workspaceActions}>
+          <TouchableOpacity
+            style={[styles.wsActionBtn, { backgroundColor: colors.primary + '12' }]}
+            onPress={() => {
+              const options = workspaces.map(w => ({
+                text: w.id === activeWorkspaceId ? `* ${w.name} (Active)` : w.name,
+                onPress: () => switchWorkspace(w.id)
+              }));
+              
+              Alert.alert(
+                'Switch Project Workspace',
+                'Select a project to load, or create a brand new coding workspace.',
+                [
+                  ...options.map(opt => ({ text: opt.text, onPress: opt.onPress })),
+                  {
+                    text: '+ Create New Workspace',
+                    onPress: () => {
+                      Alert.prompt(
+                        'New Workspace',
+                        'Enter a name for your new workspace project:',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Create',
+                            onPress: (name) => {
+                              if (name && name.trim()) {
+                                createWorkspace(name.trim());
+                              }
+                            }
+                          }
+                        ]
+                      );
+                    }
+                  },
+                  { text: 'Cancel', style: 'cancel' }
+                ]
+              );
+            }}
+          >
+            <Icon name="swap-horizontal" size={14} color={colors.primary} />
+            <Text style={[styles.wsActionText, { color: colors.primary }]}>Switch Project</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Sub-Header Actions */}
       <View style={[styles.subHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <View style={styles.subHeaderLeft}>
@@ -656,5 +722,43 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     marginLeft: 6,
+  },
+  workspaceSelectorBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+  },
+  workspaceInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  workspaceLabel: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+  workspaceName: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+  },
+  workspaceActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  wsActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  wsActionText: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
   },
 });

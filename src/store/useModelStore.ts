@@ -11,6 +11,7 @@ interface ModelState {
   updateModelProgress: (modelId: string, progress: number) => void;
   setModelStatus: (modelId: string, status: ModelInfo['downloadStatus']) => void;
   setLoadingModelId: (modelId: string | null) => void;
+  updateModelMmproj: (modelId: string, mmprojPath: string | undefined) => void;
 }
 
 export const useModelStore = create<ModelState>((set) => ({
@@ -48,4 +49,15 @@ export const useModelStore = create<ModelState>((set) => ({
     })),
 
   setLoadingModelId: (modelId) => set({ loadingModelId: modelId }),
+
+  updateModelMmproj: (modelId, mmprojPath) =>
+    set((state) => ({
+      downloadedModels: state.downloadedModels.map((m) =>
+        m.id === modelId ? { ...m, mmprojPath, isMultimodal: !!mmprojPath } : m
+      ),
+      activeModel:
+        state.activeModel?.id === modelId
+          ? { ...state.activeModel, mmprojPath, isMultimodal: !!mmprojPath }
+          : state.activeModel,
+    })),
 }));

@@ -21,12 +21,27 @@ export interface Bookmark {
   url: string;
 }
 
+export interface Workspace {
+  id: string;
+  name: string;
+  files: FileItem[];
+  terminalHistory: CommandHistory[];
+  browserUrl: string;
+  bookmarks: Bookmark[];
+}
+
 interface WorkspaceState {
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
   files: FileItem[];
   activeFileId: string | null;
   terminalHistory: CommandHistory[];
   browserUrl: string;
   bookmarks: Bookmark[];
+  
+  createWorkspace: (name: string) => string;
+  switchWorkspace: (id: string) => void;
+  deleteWorkspace: (id: string) => void;
   addFile: (name: string, type: 'file' | 'folder', content?: string) => string;
   updateFileContent: (id: string, content: string) => void;
   deleteFile: (id: string) => void;
@@ -34,6 +49,7 @@ interface WorkspaceState {
   addTerminalCommand: (command: string, output: string) => void;
   clearTerminalHistory: () => void;
   setBrowserUrl: (url: string) => void;
+  resetWorkspaces: () => void;
 }
 
 const getLanguageFromExt = (filename: string): string => {
@@ -47,14 +63,13 @@ const getLanguageFromExt = (filename: string): string => {
   return map[ext] || 'text';
 };
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  files: [
-    {
-      id: '1',
-      name: 'index.html',
-      type: 'file',
-      language: 'html',
-      content: `<!DOCTYPE html>
+const initialFiles: FileItem[] = [
+  {
+    id: '1',
+    name: 'index.html',
+    type: 'file',
+    language: 'html',
+    content: `<!DOCTYPE html>
 <html>
 <head>
   <title>Pocket Showcase</title>
@@ -103,44 +118,155 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   </div>
 </body>
 </html>`
-    },
+  },
+  {
+    id: '2',
+    name: 'main.js',
+    type: 'file',
+    language: 'javascript',
+    content: '// Welcome to PocketLLM IDE\n\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet("World"));'
+  },
+  {
+    id: '3',
+    name: 'app.ts',
+    type: 'file',
+    language: 'typescript',
+    content: '// TypeScript example\nconst greet = (name: string): string => `Hello, ${name}!`;'
+  },
+  {
+    id: '4',
+    name: 'utils',
+    type: 'folder'
+  },
+  {
+    id: '5',
+    name: 'README.md',
+    type: 'file',
+    language: 'markdown',
+    content: '# PocketLLM IDE\n\nCode smarter with AI assistance.'
+  }
+];
+
+const initialBookmarks: Bookmark[] = [
+  { id: '1', title: 'Local Server', url: 'http://localhost:3000' },
+  { id: '2', title: 'Google', url: 'https://google.com' },
+  { id: '3', title: 'GitHub', url: 'https://github.com' },
+  { id: '4', title: 'Stack Overflow', url: 'https://stackoverflow.com' },
+  { id: '5', title: 'MDN', url: 'https://developer.mozilla.org' },
+];
+
+export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+  workspaces: [
     {
-      id: '2',
-      name: 'main.js',
-      type: 'file',
-      language: 'javascript',
-      content: '// Welcome to PocketLLM IDE\n\nfunction greet(name) {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet("World"));'
-    },
-    {
-      id: '3',
-      name: 'app.ts',
-      type: 'file',
-      language: 'typescript',
-      content: '// TypeScript example\nconst greet = (name: string): string => `Hello, ${name}!`;'
-    },
-    {
-      id: '4',
-      name: 'utils',
-      type: 'folder'
-    },
-    {
-      id: '5',
-      name: 'README.md',
-      type: 'file',
-      language: 'markdown',
-      content: '# PocketLLM IDE\n\nCode smarter with AI assistance.'
+      id: 'default',
+      name: 'Default Project',
+      files: initialFiles,
+      terminalHistory: [],
+      browserUrl: 'http://localhost:3000',
+      bookmarks: initialBookmarks,
     }
   ],
+  activeWorkspaceId: 'default',
+  files: initialFiles,
   activeFileId: '1',
   terminalHistory: [],
   browserUrl: 'http://localhost:3000',
-  bookmarks: [
-    { id: '1', title: 'Local Server', url: 'http://localhost:3000' },
-    { id: '2', title: 'Google', url: 'https://google.com' },
-    { id: '3', title: 'GitHub', url: 'https://github.com' },
-    { id: '4', title: 'Stack Overflow', url: 'https://stackoverflow.com' },
-    { id: '5', title: 'MDN', url: 'https://developer.mozilla.org' },
-  ],
+  bookmarks: initialBookmarks,
+
+  createWorkspace: (name) => {
+    const id = Date.now().toString();
+    const newWorkspace: Workspace = {
+      id,
+      name: name.trim(),
+      files: [
+        {
+          id: '1',
+          name: 'index.html',
+          type: 'file',
+          language: 'html',
+          content: `<!DOCTYPE html>\n<html>\n<head>\n  <title>${name}</title>\n</head>\n<body>\n  <h1>Welcome to ${name}! 🚀</h1>\n</body>\n</html>`
+        }
+      ],
+      terminalHistory: [],
+      browserUrl: 'http://localhost:3000',
+      bookmarks: [
+        { id: '1', title: 'Local Server', url: 'http://localhost:3000' }
+      ]
+    };
+    
+    set((state) => {
+      // Save current active workspace state before adding new one
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return {
+            ...w,
+            files: state.files,
+            terminalHistory: state.terminalHistory,
+            browserUrl: state.browserUrl,
+            bookmarks: state.bookmarks,
+          };
+        }
+        return w;
+      });
+
+      return {
+        workspaces: [...updatedWorkspaces, newWorkspace],
+        activeWorkspaceId: id,
+        files: newWorkspace.files,
+        activeFileId: '1',
+        terminalHistory: [],
+        browserUrl: 'http://localhost:3000',
+        bookmarks: newWorkspace.bookmarks,
+      };
+    });
+    
+    return id;
+  },
+
+  switchWorkspace: (id) => set((state) => {
+    const target = state.workspaces.find(w => w.id === id);
+    if (!target) return {};
+    
+    // Save current active workspace files/terminal state before switching
+    const updatedWorkspaces = state.workspaces.map(w => {
+      if (w.id === state.activeWorkspaceId) {
+        return {
+          ...w,
+          files: state.files,
+          terminalHistory: state.terminalHistory,
+          browserUrl: state.browserUrl,
+          bookmarks: state.bookmarks,
+        };
+      }
+      return w;
+    });
+
+    return {
+      activeWorkspaceId: id,
+      workspaces: updatedWorkspaces,
+      files: target.files,
+      activeFileId: target.files.length > 0 ? target.files[0].id : null,
+      terminalHistory: target.terminalHistory,
+      browserUrl: target.browserUrl,
+      bookmarks: target.bookmarks,
+    };
+  }),
+
+  deleteWorkspace: (id) => set((state) => {
+    if (state.workspaces.length <= 1) return {}; // Keep at least one
+    const updatedWorkspaces = state.workspaces.filter(w => w.id !== id);
+    const nextWorkspace = updatedWorkspaces[0];
+    
+    return {
+      workspaces: updatedWorkspaces,
+      activeWorkspaceId: state.activeWorkspaceId === id ? nextWorkspace.id : state.activeWorkspaceId,
+      files: state.activeWorkspaceId === id ? nextWorkspace.files : state.files,
+      activeFileId: state.activeWorkspaceId === id ? (nextWorkspace.files.length > 0 ? nextWorkspace.files[0].id : null) : state.activeFileId,
+      terminalHistory: state.activeWorkspaceId === id ? nextWorkspace.terminalHistory : state.terminalHistory,
+      browserUrl: state.activeWorkspaceId === id ? nextWorkspace.browserUrl : state.browserUrl,
+      bookmarks: state.activeWorkspaceId === id ? nextWorkspace.bookmarks : state.bookmarks,
+    };
+  }),
 
   addFile: (name, type, content = '') => {
     const id = Date.now().toString();
@@ -151,29 +277,60 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       language: type === 'file' ? getLanguageFromExt(name) : undefined,
       content: type === 'file' ? content : undefined,
     };
-    set((state) => ({
-      files: [...state.files, newFile],
-      activeFileId: type === 'file' ? id : state.activeFileId,
-    }));
+    
+    set((state) => {
+      const updatedFiles = [...state.files, newFile];
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, files: updatedFiles };
+        }
+        return w;
+      });
+      return {
+        files: updatedFiles,
+        workspaces: updatedWorkspaces,
+        activeFileId: type === 'file' ? id : state.activeFileId,
+      };
+    });
     return id;
   },
 
   updateFileContent: (id, content) =>
-    set((state) => ({
-      files: state.files.map((f) => (f.id === id ? { ...f, content } : f)),
-    })),
+    set((state) => {
+      const updatedFiles = state.files.map((f) => (f.id === id ? { ...f, content } : f));
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, files: updatedFiles };
+        }
+        return w;
+      });
+      return {
+        files: updatedFiles,
+        workspaces: updatedWorkspaces,
+      };
+    }),
 
   deleteFile: (id) =>
-    set((state) => ({
-      files: state.files.filter((f) => f.id !== id),
-      activeFileId: state.activeFileId === id ? null : state.activeFileId,
-    })),
+    set((state) => {
+      const updatedFiles = state.files.filter((f) => f.id !== id);
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, files: updatedFiles };
+        }
+        return w;
+      });
+      return {
+        files: updatedFiles,
+        workspaces: updatedWorkspaces,
+        activeFileId: state.activeFileId === id ? null : state.activeFileId,
+      };
+    }),
 
   setActiveFileId: (id) => set({ activeFileId: id }),
 
   addTerminalCommand: (command, output) =>
-    set((state) => ({
-      terminalHistory: [
+    set((state) => {
+      const updatedHistory = [
         ...state.terminalHistory,
         {
           id: Date.now().toString() + Math.random(),
@@ -181,10 +338,63 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
           output,
           timestamp: new Date(),
         },
-      ],
-    })),
+      ];
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, terminalHistory: updatedHistory };
+        }
+        return w;
+      });
+      return {
+        terminalHistory: updatedHistory,
+        workspaces: updatedWorkspaces,
+      };
+    }),
 
-  clearTerminalHistory: () => set({ terminalHistory: [] }),
+  clearTerminalHistory: () =>
+    set((state) => {
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, terminalHistory: [] };
+        }
+        return w;
+      });
+      return {
+        terminalHistory: [],
+        workspaces: updatedWorkspaces,
+      };
+    }),
 
-  setBrowserUrl: (url) => set({ browserUrl: url }),
+  setBrowserUrl: (url) =>
+    set((state) => {
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, browserUrl: url };
+        }
+        return w;
+      });
+      return {
+        browserUrl: url,
+        workspaces: updatedWorkspaces,
+      };
+    }),
+
+  resetWorkspaces: () => set({
+    workspaces: [
+      {
+        id: 'default',
+        name: 'Default Project',
+        files: initialFiles,
+        terminalHistory: [],
+        browserUrl: 'http://localhost:3000',
+        bookmarks: initialBookmarks,
+      }
+    ],
+    activeWorkspaceId: 'default',
+    files: initialFiles,
+    activeFileId: '1',
+    terminalHistory: [],
+    browserUrl: 'http://localhost:3000',
+    bookmarks: initialBookmarks,
+  }),
 }));

@@ -16,6 +16,7 @@ interface ModelCardProps {
   onDelete?: () => void;
   onRetry?: () => void;
   onCancel?: () => void;
+  onAttachMmproj?: () => void;
   darkMode: boolean;
 }
 
@@ -29,6 +30,7 @@ export const ModelCard: React.FC<ModelCardProps> = ({
   onDelete,
   onRetry,
   onCancel,
+  onAttachMmproj,
   darkMode,
 }) => {
   const colors = darkMode ? COLORS.dark : COLORS.light;
@@ -219,6 +221,19 @@ export const ModelCard: React.FC<ModelCardProps> = ({
               >
                 <Icon name="play" size={14} color={colors.primary} />
                 <Text style={[styles.actionText, { color: colors.primary }]}>Load</Text>
+              </TouchableOpacity>
+            )}
+            {onAttachMmproj && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.info + '12' }]}
+                onPress={onAttachMmproj}
+                activeOpacity={0.85}
+                disabled={isLoading}
+              >
+                <Icon name="camera-outline" size={14} color={colors.info} />
+                <Text style={[styles.actionText, { color: colors.info }]}>
+                  {model.mmprojPath ? 'CLIP ✓' : 'CLIP +'}
+                </Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity

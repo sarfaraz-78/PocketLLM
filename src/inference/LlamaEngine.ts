@@ -99,6 +99,19 @@ export class LlamaEngine {
 
   executeTool(tool: string, args: any): string {
     switch (tool) {
+      case 'workspace_create':
+        const wsId = useWorkspaceStore.getState().createWorkspace(args.name || 'New Project');
+        return `Workspace "${args.name || 'New Project'}" created successfully with ID "${wsId}". It is now set as the active project. You can start creating files using ide_write.`;
+      case 'workspace_list':
+        const list = useWorkspaceStore.getState().workspaces.map(w => `- ${w.name} (id: ${w.id})`).join('\n');
+        return `Available workspaces:\n${list || '(None)'}`;
+      case 'workspace_switch':
+        const wsIdSwitch = args.id;
+        if (!wsIdSwitch) return 'Error: Workspace ID is required';
+        const exists = useWorkspaceStore.getState().workspaces.find(w => w.id === wsIdSwitch);
+        if (!exists) return `Error: Workspace with ID ${wsIdSwitch} not found`;
+        useWorkspaceStore.getState().switchWorkspace(wsIdSwitch);
+        return `Switched to workspace "${exists.name}" (id: ${wsIdSwitch}) successfully. Active files and terminal have been updated.`;
       case 'terminal':
         return this.executeTerminalCommand(args.command || args.cmd || '');
       case 'ide_write':

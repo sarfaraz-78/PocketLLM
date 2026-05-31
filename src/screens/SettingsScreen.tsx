@@ -66,9 +66,12 @@ export const SettingsScreen: React.FC = () => {
   }, []);
 
   const handleReset = () => {
-    Alert.alert('Reset Settings', 'Reset all settings to defaults?', [
+    Alert.alert('Reset Settings', 'Reset all configuration settings back to defaults? Your workspaces and files will NOT be touched.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => { resetToDefaults(); Alert.alert('Success', 'Settings reset to defaults'); } },
+      { text: 'Reset Settings', style: 'destructive', onPress: () => { 
+        resetToDefaults(); 
+        Alert.alert('Reset Complete', 'System settings have been restored.'); 
+      } },
     ]);
   };
 
@@ -207,7 +210,26 @@ export const SettingsScreen: React.FC = () => {
           />
         </Card>
 
-        <Button title="Reset to Defaults" variant="danger" icon="refresh-outline" onPress={handleReset} fullWidth darkMode={darkMode} />
+        <Card style={[styles.card, { borderColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1 }]} darkMode={darkMode}>
+          <Text style={[styles.cardTitle, { color: colors.textSecondary }]}>System Reset</Text>
+          <Text style={[styles.maintenanceText, { color: colors.textSecondary, marginBottom: SPACING.md }]}>
+            Restoring defaults will reset system prompts, hardware speedup settings, and parameters. Your projects and workspace files will remain completely safe.
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.resetButton,
+              {
+                borderColor: '#EF4444',
+                backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.03)',
+              }
+            ]}
+            onPress={handleReset}
+            activeOpacity={0.7}
+          >
+            <Icon name="refresh-outline" size={18} color="#EF4444" style={{ marginRight: 8 }} />
+            <Text style={styles.resetButtonText}>Reset Settings to Default</Text>
+          </TouchableOpacity>
+        </Card>
 
         <View style={styles.madeIn}>
           <Text style={[styles.madeInText, { color: colors.textSecondary }]}>Made with</Text>
@@ -272,5 +294,25 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     flex: 1,
     fontWeight: '500',
+  },
+  maintenanceText: {
+    fontSize: FONT_SIZES.xs + 1,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  resetButtonText: {
+    color: '#EF4444',
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

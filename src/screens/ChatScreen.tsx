@@ -147,7 +147,27 @@ export const ChatScreen: React.FC = () => {
     setGenerating(true);
 
     try {
-      const codingModeTools = codingMode ? ' Tools: terminal (cmd), ide_write, ide_read, ide_delete, ide_list, browser_open. When user asks to execute commands, write code, or open URLs, use these tools by including ```tool\n{"tool": "name", "args": {...}}\n``` in your response.' : '';
+      const codingModeTools = codingMode 
+        ? '\n\n[AGENT WORKSPACE SYSTEM]: You are an Autonomous Coding Agent with full environment control. ' +
+          'You can organize files into isolated projects by creating, listing, or switching workspaces. ' +
+          'When the user requests a new app, website, or task, ALWAYS start by creating a new workspace for it if needed, ' +
+          'then populate it with the necessary files (index.html, styles.css, app.js, etc.) using `ide_write`. ' +
+          'Available Tools:\n' +
+          '- `workspace_create` (args: { name: string }): Creates a new workspace/project and switches to it.\n' +
+          '- `workspace_list` (args: {}): Lists all workspaces.\n' +
+          '- `workspace_switch` (args: { id: string }): Switches to the workspace with the specified ID.\n' +
+          '- `ide_write` (args: { filename: string, content: string }): Writes/updates a file in the active workspace.\n' +
+          '- `ide_read` (args: { filename: string }): Reads a file from the active workspace.\n' +
+          '- `ide_delete` (args: { filename: string }): Deletes a file from the active workspace.\n' +
+          '- `ide_list` (args: {}): Lists all files in the active workspace.\n' +
+          '- `terminal` (args: { command: string }): Executes commands (clear, ls, pwd, uptime, whoami, echo).\n' +
+          '- `browser_open` (args: { url: string }): Opens a URL in the workspace browser.\n\n' +
+          'To call a tool, format it EXACTLY as:\n' +
+          '```tool\n' +
+          '{"tool": "tool_name", "args": {...}}\n' +
+          '```\n' +
+          'You can execute multiple tool blocks in sequence in a single response to construct a fully functional project autonomously. Act like an expert agent!'
+        : '';
 
       let workspaceContext = '';
       if (codingMode) {

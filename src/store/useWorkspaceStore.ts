@@ -21,6 +21,14 @@ export interface Bookmark {
   url: string;
 }
 
+export interface GitCommit {
+  id: string;
+  message: string;
+  author: string;
+  timestamp: Date;
+  filesSnapshot: FileItem[];
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -28,6 +36,9 @@ export interface Workspace {
   terminalHistory: CommandHistory[];
   browserUrl: string;
   bookmarks: Bookmark[];
+  gitInitialized: boolean;
+  gitStaged: string[];
+  gitCommits: GitCommit[];
 }
 
 interface WorkspaceState {
@@ -38,8 +49,11 @@ interface WorkspaceState {
   terminalHistory: CommandHistory[];
   browserUrl: string;
   bookmarks: Bookmark[];
+  gitInitialized: boolean;
+  gitStaged: string[];
+  gitCommits: GitCommit[];
   
-  createWorkspace: (name: string) => string;
+  createWorkspace: (name: string, templateType?: 'blank' | 'glassmorphic' | 'profile' | 'chat') => string;
   switchWorkspace: (id: string) => void;
   deleteWorkspace: (id: string) => void;
   addFile: (name: string, type: 'file' | 'folder', content?: string) => string;
@@ -50,7 +64,326 @@ interface WorkspaceState {
   clearTerminalHistory: () => void;
   setBrowserUrl: (url: string) => void;
   resetWorkspaces: () => void;
+  initGit: () => void;
+  stageFile: (name: string) => boolean;
+  stageAllFiles: () => void;
+  commitGit: (message: string, author: string) => string | null;
 }
+
+export const TEMPLATES = {
+  blank: {
+    files: (name: string): FileItem[] => [
+      {
+        id: '1',
+        name: 'index.html',
+        type: 'file',
+        language: 'html',
+        content: `<!DOCTYPE html>\n<html>\n<head>\n  <title>${name}</title>\n</head>\n<body>\n  <h1>Welcome to ${name}! 🚀</h1>\n</body>\n</html>`
+      }
+    ]
+  },
+  glassmorphic: {
+    files: (name: string): FileItem[] => [
+      {
+        id: '1',
+        name: 'index.html',
+        type: 'file',
+        language: 'html',
+        content: `<!DOCTYPE html>
+<html>
+<head>
+  <title>Developer Hub - Glassmorphism</title>
+  <style>
+    body {
+      background-color: #030712;
+      color: #f9fafb;
+      font-family: system-ui, sans-serif;
+      padding: 24px;
+    }
+    .dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .glass-card {
+      background-color: rgba(11, 15, 25, 0.7);
+      border: 1px solid rgba(129, 140, 248, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    h1 {
+      color: #818cf8;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    p {
+      color: #9ca3af;
+      font-size: 14px;
+      line-height: 20px;
+    }
+    .row {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .col {
+      flex: 1;
+      min-width: 140px;
+    }
+    .btn {
+      background-color: #6366f1;
+      color: #ffffff;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 12px;
+    }
+    .accent-text {
+      color: #f472b6;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="glass-card">
+      <h1>Developer Workspace Hub ⚡</h1>
+      <p>A beautiful responsive dark dashboard leveraging advanced pocketllm-webkit nested rendering, border glows, and glass backgrounds.</p>
+    </div>
+    
+    <div class="row">
+      <div class="glass-card col">
+        <h3 style="color: #60a5fa; margin-bottom: 8px;">System Metrics</h3>
+        <p>Inference Status: <span class="accent-text">Active</span></p>
+        <p>GPU Acceleration: <span style="color: #34d399;">Vulkan API</span></p>
+      </div>
+      <div class="glass-card col">
+        <h3 style="color: #a78bfa; margin-bottom: 8px;">Active Projects</h3>
+        <p>Local Repositories: <span>3 Active</span></p>
+        <p>Live Port: <span>3000 (Live Reload)</span></p>
+      </div>
+    </div>
+    
+    <div class="glass-card" style="align-items: center;">
+      <h3 style="color: #818cf8;">Ready to Launch?</h3>
+      <p>Click the interactive button below to trigger live click counters!</p>
+      <button class="btn">Launch Server</button>
+    </div>
+  </div>
+</body>
+</html>`
+      }
+    ]
+  },
+  profile: {
+    files: (name: string): FileItem[] => [
+      {
+        id: '1',
+        name: 'index.html',
+        type: 'file',
+        language: 'html',
+        content: `<!DOCTYPE html>
+<html>
+<head>
+  <title>Interactive Dev Profile</title>
+  <style>
+    body {
+      background-color: #0b0f19;
+      color: #ffffff;
+      font-family: sans-serif;
+      padding: 16px;
+    }
+    .profile-card {
+      background-color: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 20px;
+      padding: 24px;
+      align-items: center;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 40px;
+      border: 3px solid #818cf8;
+    }
+    h2 {
+      font-size: 22px;
+      font-weight: bold;
+      color: #818cf8;
+      margin-bottom: 2px;
+    }
+    .title {
+      color: #f472b6;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .skills-list {
+      margin-top: 16px;
+      width: 100%;
+    }
+    .skills-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #9ca3af;
+      margin-bottom: 6px;
+    }
+    .nav-btn {
+      color: #818cf8;
+      text-decoration: underline;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="profile-card">
+    <img class="avatar" src="https://picsum.photos/100/100" alt="avatar" />
+    <h2>Senior Code Agent</h2>
+    <div class="title">PocketLLM AI Assistant · GGUF Engine</div>
+    
+    <p style="text-align: center; color: #9ca3af; font-size: 13px;">
+      Offline coding specialist powered by Qwen 2.5 Coder. Designed to compile files, run terminals, and host multi-page sites on device.
+    </p>
+    
+    <div class="skills-list">
+      <div class="skills-title">OFFLINE CAPABILITIES:</div>
+      <ul>
+        <li style="color: #60a5fa;">Multi-page Local Server Router</li>
+        <li style="color: #34d399;">Git Repository Simulation logs</li>
+        <li style="color: #a78bfa;">Interactive monospaced shell editor</li>
+      </ul>
+    </div>
+    
+    <a href="projects.html" class="nav-btn">View Staged Projects</a>
+  </div>
+</body>
+</html>`
+      },
+      {
+        id: '2',
+        name: 'projects.html',
+        type: 'file',
+        language: 'html',
+        content: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { background-color: #0b0f19; color: white; font-family: sans-serif; padding: 20px; }
+    h1 { color: #f472b6; font-size: 20px; font-weight: bold; }
+    .project { background-color: #111827; border: 1px solid #1f2937; padding: 12px; border-radius: 8px; margin-top: 10px; }
+    .back { color: #818cf8; margin-top: 20px; display: block; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Active Projects List</h1>
+  <div class="project">
+    <h3 style="color: #60a5fa;">Live Web Previewer v1.1</h3>
+    <p style="color: #cccccc; font-size: 12px;">Cascading CSS stylesheet render engine with custom responsive inputs.</p>
+  </div>
+  <div class="project">
+    <h3 style="color: #34d399;">Simulated Git shell suite</h3>
+    <p style="color: #cccccc; font-size: 12px;">Full commit logs history timeline with colored line additions/deletions diffs.</p>
+  </div>
+  <a href="index.html" class="back">Back to profile</a>
+</body>
+</html>`
+      }
+    ]
+  },
+  chat: {
+    files: (name: string): FileItem[] => [
+      {
+        id: '1',
+        name: 'index.html',
+        type: 'file',
+        language: 'html',
+        content: `<!DOCTYPE html>
+<html>
+<head>
+  <title>Offline Chat Simulator</title>
+  <style>
+    body {
+      background-color: #030712;
+      color: #ffffff;
+      font-family: sans-serif;
+      padding: 16px;
+    }
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      gap: 12px;
+    }
+    .chat-header {
+      background-color: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+      align-items: center;
+    }
+    .bubble-user {
+      background-color: #6366f1;
+      padding: 10px 14px;
+      border-radius: 14px;
+      align-self: flex-end;
+      max-width: 80%;
+      margin-left: 20%;
+    }
+    .bubble-agent {
+      background-color: #1f2937;
+      padding: 10px 14px;
+      border-radius: 14px;
+      align-self: flex-start;
+      max-width: 80%;
+      margin-right: 20%;
+    }
+    .text-input-row {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+    }
+    .input-box {
+      flex: 1;
+      background-color: #111827;
+      color: white;
+      border: 1px solid #1f2937;
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h3 style="color: #6366f1; font-weight: bold;">Pocket-AI Simulator</h3>
+    </div>
+    
+    <div class="bubble-user">
+      <p style="margin: 0; font-size: 13px;">Hi, can you run coding models locally on mobile devices?</p>
+    </div>
+    
+    <div class="bubble-agent">
+      <p style="margin: 0; font-size: 13px; color: #f9fafb;">Yes! PocketLLM uses llama.rn to run GGUF models offline. Try the Qwen 2.5 Coder recommended model!</p>
+    </div>
+    
+    <div class="text-input-row">
+      <input class="input-box" type="text" placeholder="Type a message to test active input..." />
+      <button style="background-color: #6366f1; color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold;">Send</button>
+    </div>
+  </div>
+</body>
+</html>`
+      }
+    ]
+  }
+};
 
 const getLanguageFromExt = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -164,6 +497,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: [],
       browserUrl: 'http://localhost:3000',
       bookmarks: initialBookmarks,
+      gitInitialized: false,
+      gitStaged: [],
+      gitCommits: [],
     }
   ],
   activeWorkspaceId: 'default',
@@ -172,26 +508,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   terminalHistory: [],
   browserUrl: 'http://localhost:3000',
   bookmarks: initialBookmarks,
+  gitInitialized: false,
+  gitStaged: [],
+  gitCommits: [],
 
-  createWorkspace: (name) => {
+  createWorkspace: (name, templateType = 'blank') => {
     const id = Date.now().toString();
+    const template = TEMPLATES[templateType] || TEMPLATES['blank'];
     const newWorkspace: Workspace = {
       id,
       name: name.trim(),
-      files: [
-        {
-          id: '1',
-          name: 'index.html',
-          type: 'file',
-          language: 'html',
-          content: `<!DOCTYPE html>\n<html>\n<head>\n  <title>${name}</title>\n</head>\n<body>\n  <h1>Welcome to ${name}! 🚀</h1>\n</body>\n</html>`
-        }
-      ],
+      files: template.files(name.trim()),
       terminalHistory: [],
       browserUrl: 'http://localhost:3000',
       bookmarks: [
         { id: '1', title: 'Local Server', url: 'http://localhost:3000' }
-      ]
+      ],
+      gitInitialized: false,
+      gitStaged: [],
+      gitCommits: [],
     };
     
     set((state) => {
@@ -204,6 +539,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
             terminalHistory: state.terminalHistory,
             browserUrl: state.browserUrl,
             bookmarks: state.bookmarks,
+            gitInitialized: state.gitInitialized,
+            gitStaged: state.gitStaged,
+            gitCommits: state.gitCommits,
           };
         }
         return w;
@@ -213,10 +551,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         workspaces: [...updatedWorkspaces, newWorkspace],
         activeWorkspaceId: id,
         files: newWorkspace.files,
-        activeFileId: '1',
+        activeFileId: newWorkspace.files.length > 0 ? newWorkspace.files[0].id : null,
         terminalHistory: [],
         browserUrl: 'http://localhost:3000',
         bookmarks: newWorkspace.bookmarks,
+        gitInitialized: false,
+        gitStaged: [],
+        gitCommits: [],
       };
     });
     
@@ -236,6 +577,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
           terminalHistory: state.terminalHistory,
           browserUrl: state.browserUrl,
           bookmarks: state.bookmarks,
+          gitInitialized: state.gitInitialized,
+          gitStaged: state.gitStaged,
+          gitCommits: state.gitCommits,
         };
       }
       return w;
@@ -249,6 +593,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: target.terminalHistory,
       browserUrl: target.browserUrl,
       bookmarks: target.bookmarks,
+      gitInitialized: target.gitInitialized ?? false,
+      gitStaged: target.gitStaged ?? [],
+      gitCommits: target.gitCommits ?? [],
     };
   }),
 
@@ -265,6 +612,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: state.activeWorkspaceId === id ? nextWorkspace.terminalHistory : state.terminalHistory,
       browserUrl: state.activeWorkspaceId === id ? nextWorkspace.browserUrl : state.browserUrl,
       bookmarks: state.activeWorkspaceId === id ? nextWorkspace.bookmarks : state.bookmarks,
+      gitInitialized: state.activeWorkspaceId === id ? (nextWorkspace.gitInitialized ?? false) : state.gitInitialized,
+      gitStaged: state.activeWorkspaceId === id ? (nextWorkspace.gitStaged ?? []) : state.gitStaged,
+      gitCommits: state.activeWorkspaceId === id ? (nextWorkspace.gitCommits ?? []) : state.gitCommits,
     };
   }),
 
@@ -388,6 +738,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         terminalHistory: [],
         browserUrl: 'http://localhost:3000',
         bookmarks: initialBookmarks,
+        gitInitialized: false,
+        gitStaged: [],
+        gitCommits: [],
       }
     ],
     activeWorkspaceId: 'default',
@@ -396,5 +749,91 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     terminalHistory: [],
     browserUrl: 'http://localhost:3000',
     bookmarks: initialBookmarks,
+    gitInitialized: false,
+    gitStaged: [],
+    gitCommits: [],
   }),
+
+  initGit: () => set((state) => {
+    const updatedWorkspaces = state.workspaces.map(w => {
+      if (w.id === state.activeWorkspaceId) {
+        return { ...w, gitInitialized: true, gitStaged: [], gitCommits: [] };
+      }
+      return w;
+    });
+    return {
+      gitInitialized: true,
+      gitStaged: [],
+      gitCommits: [],
+      workspaces: updatedWorkspaces,
+    };
+  }),
+
+  stageFile: (name) => {
+    let success = false;
+    set((state) => {
+      const exists = state.files.some(f => f.name.toLowerCase() === name.toLowerCase() && f.type === 'file');
+      if (!exists) return {};
+
+      success = true;
+      const alreadyStaged = state.gitStaged.includes(name);
+      const updatedStaged = alreadyStaged ? state.gitStaged : [...state.gitStaged, name];
+
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, gitStaged: updatedStaged };
+        }
+        return w;
+      });
+
+      return {
+        gitStaged: updatedStaged,
+        workspaces: updatedWorkspaces,
+      };
+    });
+    return success;
+  },
+
+  stageAllFiles: () => set((state) => {
+    const allFileNames = state.files.filter(f => f.type === 'file').map(f => f.name);
+    const updatedWorkspaces = state.workspaces.map(w => {
+      if (w.id === state.activeWorkspaceId) {
+        return { ...w, gitStaged: allFileNames };
+      }
+      return w;
+    });
+    return {
+      gitStaged: allFileNames,
+      workspaces: updatedWorkspaces,
+    };
+  }),
+
+  commitGit: (message, author) => {
+    let sha = '';
+    set((state) => {
+      sha = Math.random().toString(36).substring(2, 9);
+      const newCommit: GitCommit = {
+        id: sha,
+        message,
+        author,
+        timestamp: new Date(),
+        filesSnapshot: JSON.parse(JSON.stringify(state.files)),
+      };
+
+      const updatedCommits = [...state.gitCommits, newCommit];
+      const updatedWorkspaces = state.workspaces.map(w => {
+        if (w.id === state.activeWorkspaceId) {
+          return { ...w, gitStaged: [], gitCommits: updatedCommits };
+        }
+        return w;
+      });
+
+      return {
+        gitStaged: [],
+        gitCommits: updatedCommits,
+        workspaces: updatedWorkspaces,
+      };
+    });
+    return sha;
+  },
 }));

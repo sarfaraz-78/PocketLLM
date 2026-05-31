@@ -91,7 +91,7 @@ export const SettingsScreen: React.FC = () => {
               )}
             </View>
             {deviceProfile && (
-              <View style={styles.hardwareInfo}>
+              <View style={[styles.hardwareInfo, { borderTopColor: colors.border }]}>
                 <View style={styles.hardwareRow}>
                   <Icon name="hardware-chip-outline" size={14} color={colors.textSecondary} />
                   <Text style={[styles.hardwareText, { color: colors.textSecondary }]}>{deviceProfile.cpuModel}</Text>
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: FONT_SIZES.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SPACING.md },
   tierRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   overrideText: { fontSize: FONT_SIZES.sm, fontWeight: '600' },
-  hardwareInfo: { marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: '#334155' },
+  hardwareInfo: { marginTop: SPACING.md, paddingTop: SPACING.md, borderTopWidth: 1 },
   hardwareRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xs },
   hardwareText: { fontSize: FONT_SIZES.sm, fontWeight: '400', marginLeft: SPACING.sm },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

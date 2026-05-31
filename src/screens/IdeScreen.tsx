@@ -8,6 +8,7 @@ import {
   TextInput,
   FlatList,
   Alert,
+  Modal,
   Platform,
   Dimensions,
 } from 'react-native';
@@ -62,6 +63,21 @@ export const IdeScreen: React.FC = () => {
   const [newFileName, setNewFileName] = useState('');
   const [openTabs, setOpenTabs] = useState<string[]>(['1', '2', '4']);
   const [showAgentLog, setShowAgentLog] = useState(true);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [pendingWorkspaceName, setPendingWorkspaceName] = useState('');
+
+  const handleInsertChar = (char: string) => {
+    if (!currentFile) return;
+    const content = currentFile.content || '';
+    const toInsert = char === 'Tab' ? '  ' : char;
+    const start = selection.start;
+    const end = selection.end;
+    const newContent = content.substring(0, start) + toInsert + content.substring(end);
+    updateFileContent(currentFile.id, newContent);
+    const newCursor = start + toInsert.length;
+    setSelection({ start: newCursor, end: newCursor });
+  };
 
   const currentFile = files.find((f) => f.id === activeFileId);
 
@@ -197,10 +213,11 @@ export const IdeScreen: React.FC = () => {
                         [
                           { text: 'Cancel', style: 'cancel' },
                           {
-                            text: 'Create',
+                            text: 'Choose Template',
                             onPress: (name) => {
                               if (name && name.trim()) {
-                                createWorkspace(name.trim());
+                                setPendingWorkspaceName(name.trim());
+                                setShowTemplateModal(true);
                               }
                             }
                           }
@@ -377,6 +394,8 @@ export const IdeScreen: React.FC = () => {
                     ]}
                     value={currentFile.content || ''}
                     onChangeText={(val) => updateFileContent(currentFile.id, val)}
+                    onSelectionChange={(e) => setSelection(e.nativeEvent.selection)}
+                    selection={selection}
                     multiline
                     placeholder="// Start coding..."
                     placeholderTextColor={colors.textTertiary}
@@ -387,6 +406,22 @@ export const IdeScreen: React.FC = () => {
                   />
                 </View>
               </ScrollView>
+
+              {/* Monospaced Quick Keyboard Shortcut Drawer */}
+              <View style={[styles.keyboardBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.keyboardScroll}>
+                  {['Tab', '{', '}', '[', ']', '(', ')', '<', '>', ';', '=', '"', "'", '$', ':', ',', '/'].map((char) => (
+                    <TouchableOpacity
+                      key={char}
+                      style={[styles.keyboardKey, { backgroundColor: darkMode ? '#1e293b' : '#f1f5f9', borderColor: colors.border }]}
+                      onPress={() => handleInsertChar(char)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.keyboardKeyText, { color: colors.primary }]}>{char}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
 
               {/* Monospace Code Editor Status Bar Footer */}
               <View style={[styles.editorFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
@@ -455,6 +490,61 @@ export const IdeScreen: React.FC = () => {
           </ScrollView>
         </View>
       )}
+
+      {/* Template Picker Modal */}
+      <Modal
+        visible={showTemplateModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTemplateModal(false)}
+      >
+        <View style={styles.templateOverlay}>
+          <View style={[styles.templateSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.templateHandle} />
+            <Text style={[styles.templateTitle, { color: colors.text }]}>Choose a Template</Text>
+            <Text style={[styles.templateSubtitle, { color: colors.textSecondary }]}>
+              Pick a starter layout for "{pendingWorkspaceName}"
+            </Text>
+
+            <ScrollView style={styles.templateList} showsVerticalScrollIndicator={false}>
+              {[
+                { key: 'blank' as const, icon: 'document-outline', label: 'Blank Project', desc: 'Empty HTML page — start from scratch', color: colors.textSecondary },
+                { key: 'glassmorphic' as const, icon: 'sparkles', label: 'Glassmorphic Dashboard', desc: 'Dark futuristic dashboard with glass cards & glow borders', color: '#818cf8' },
+                { key: 'profile' as const, icon: 'person-circle', label: 'Interactive Dev Profile', desc: 'Multi-page dev portfolio with navigation & skills list', color: '#f472b6' },
+                { key: 'chat' as const, icon: 'chatbubbles', label: 'Chat Simulator', desc: 'Offline chat mockup with message bubbles & input box', color: '#6366f1' },
+              ].map((tpl) => (
+                <TouchableOpacity
+                  key={tpl.key}
+                  style={[styles.templateOption, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    setShowTemplateModal(false);
+                    createWorkspace(pendingWorkspaceName, tpl.key);
+                    setPendingWorkspaceName('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.templateIconBox, { backgroundColor: tpl.color + '18' }]}>
+                    <Icon name={tpl.icon} size={24} color={tpl.color} />
+                  </View>
+                  <View style={styles.templateInfo}>
+                    <Text style={[styles.templateLabel, { color: colors.text }]}>{tpl.label}</Text>
+                    <Text style={[styles.templateDesc, { color: colors.textSecondary }]} numberOfLines={2}>{tpl.desc}</Text>
+                  </View>
+                  <Icon name="chevron-forward" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.templateCancelBtn, { backgroundColor: colors.surfaceVariant }]}
+              onPress={() => { setShowTemplateModal(false); setPendingWorkspaceName(''); }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.templateCancelText, { color: colors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -759,6 +849,101 @@ const styles = StyleSheet.create({
   },
   wsActionText: {
     fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+  },
+  keyboardBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: SPACING.sm,
+  },
+  keyboardScroll: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  keyboardKey: {
+    minWidth: 36,
+    height: 32,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  keyboardKeyText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  templateOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  templateSheet: {
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.huge,
+    maxHeight: Dimensions.get('window').height * 0.65,
+  },
+  templateHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: '#CCCCCC',
+    alignSelf: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  templateTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  templateSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  templateList: {
+    maxHeight: 300,
+  },
+  templateOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    gap: SPACING.md,
+  },
+  templateIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  templateInfo: {
+    flex: 1,
+  },
+  templateLabel: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  templateDesc: {
+    fontSize: FONT_SIZES.xs,
+    lineHeight: 16,
+  },
+  templateCancelBtn: {
+    marginTop: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.xxl,
+    alignItems: 'center',
+  },
+  templateCancelText: {
+    fontSize: FONT_SIZES.md,
     fontWeight: '700',
   },
 });

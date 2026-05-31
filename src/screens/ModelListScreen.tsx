@@ -70,6 +70,7 @@ export const ModelListScreen: React.FC = () => {
   const [searchResults, setSearchResults] = useState<ModelInfo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'low' | 'medium' | 'high' | 'coding'>('all');
 
   const [quantPickerVisible, setQuantPickerVisible] = useState(false);
   const [pendingModel, setPendingModel] = useState<ModelInfo | null>(null);
@@ -92,6 +93,24 @@ export const ModelListScreen: React.FC = () => {
   const mergedSearchResults = searchResults.map((model) => {
     const dl = downloadedModels.find((m) => m.id === model.id);
     return dl || model;
+  });
+
+  const filteredSearchResults = mergedSearchResults.filter((model) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'low') {
+      return model.sizeMB <= 1500 || model.params === '0.5B' || model.params === '1.5B';
+    }
+    if (activeFilter === 'medium') {
+      return model.sizeMB > 1500 && model.sizeMB <= 3500;
+    }
+    if (activeFilter === 'high') {
+      return model.sizeMB > 3500;
+    }
+    if (activeFilter === 'coding') {
+      const id = (model.repoId || model.name || '').toLowerCase();
+      return id.includes('code') || id.includes('coder');
+    }
+    return true;
   });
 
   const recommendedModels = deviceTier ? getModelsForTier(deviceTier) : [];
@@ -662,19 +681,68 @@ export const ModelListScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Filter Chips */}
+        {hasSearched && (
+          <View style={[styles.filterChipsCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsScroll}>
+              {[
+                { key: 'all' as const, label: 'All', icon: 'apps-outline' },
+                { key: 'low' as const, label: '0.5B–1.5B', icon: 'leaf-outline' },
+                { key: 'medium' as const, label: '2B–3B', icon: 'fitness-outline' },
+                { key: 'high' as const, label: '7B+', icon: 'rocket-outline' },
+                { key: 'coding' as const, label: 'Coding', icon: 'code-slash-outline' },
+              ].map((chip) => {
+                const isActive = activeFilter === chip.key;
+                return (
+                  <TouchableOpacity
+                    key={chip.key}
+                    style={[
+                      styles.filterChip,
+                      {
+                        backgroundColor: isActive ? colors.primary + '18' : colors.surfaceVariant,
+                        borderColor: isActive ? colors.primary + '50' : colors.border,
+                      },
+                    ]}
+                    onPress={() => setActiveFilter(chip.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon
+                      name={chip.icon}
+                      size={14}
+                      color={isActive ? colors.primary : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        { color: isActive ? colors.primary : colors.textSecondary },
+                      ]}
+                    >
+                      {chip.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Search Results */}
         {hasSearched && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Search Results</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              Search Results{activeFilter !== 'all' ? ` (${filteredSearchResults.length})` : ''}
+            </Text>
             {isSearching ? (
               <View style={styles.searchingBox}>
                 <ActivityIndicator size="small" color={colors.primary} />
                 <Text style={[styles.searchingText, { color: colors.textSecondary }]}>Searching Hugging Face...</Text>
               </View>
-            ) : mergedSearchResults.length === 0 ? (
-              <Text style={[styles.noResults, { color: colors.textSecondary }]}>No GGUF models found</Text>
+            ) : filteredSearchResults.length === 0 ? (
+              <Text style={[styles.noResults, { color: colors.textSecondary }]}>
+                {mergedSearchResults.length > 0 ? 'No models match this filter' : 'No GGUF models found'}
+              </Text>
             ) : (
-              mergedSearchResults.map((model) => (
+              filteredSearchResults.map((model) => (
                 <ModelCard
                   key={model.id}
                   model={model}
@@ -1317,6 +1385,29 @@ const styles = StyleSheet.create({
   importNativeBtnText: {
     color: '#FFFFFF',
     fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+  },
+  filterChipsCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+  },
+  filterChipsScroll: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: SPACING.xs,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 7,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: FONT_SIZES.xs,
     fontWeight: '700',
   },
 });

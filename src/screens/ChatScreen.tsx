@@ -160,7 +160,7 @@ export const ChatScreen: React.FC = () => {
           '- `ide_read` (args: { filename: string }): Reads a file from the active workspace.\n' +
           '- `ide_delete` (args: { filename: string }): Deletes a file from the active workspace.\n' +
           '- `ide_list` (args: {}): Lists all files in the active workspace.\n' +
-          '- `terminal` (args: { command: string }): Executes commands (clear, ls, pwd, uptime, whoami, echo).\n' +
+          '- `terminal` (args: { command: string }): Executes commands (clear, ls, pwd, uptime, whoami, echo, node <file.js>, run <file.js>). You can run node/run to test and execute your Javascript scripts to check for runtime syntax/logical errors!\n' +
           '- `browser_open` (args: { url: string }): Opens a URL in the workspace browser.\n\n' +
           'To call a tool, format it EXACTLY as:\n' +
           '```tool\n' +

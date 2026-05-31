@@ -9,6 +9,7 @@ import {
   Linking,
   Alert,
   ScrollView,
+  Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -28,6 +29,7 @@ interface CSSStyles {
     marginTop?: number;
     borderWidth?: number;
     borderColor?: string;
+    [key: string]: any;
   };
 }
 
@@ -36,6 +38,7 @@ interface ParsedElement {
   content: string;
   className: string;
   inlineStyle: string;
+  attributes: Record<string, string>;
   children: ParsedElement[];
 }
 
@@ -88,13 +91,189 @@ export const BrowserScreen: React.FC = () => {
     }
   };
 
+  const cleanStyleValue = (val: string): any => {
+    const clean = val.trim();
+    if (clean.endsWith('px')) {
+      const num = parseFloat(clean);
+      return isNaN(num) ? clean : num;
+    }
+    if (clean.endsWith('%')) {
+      return clean;
+    }
+    const num = parseFloat(clean);
+    if (!isNaN(num) && num.toString() === clean) {
+      return num;
+    }
+    return clean;
+  };
+
+  const parseShorthand = (val: string, prefix: 'margin' | 'padding'): Record<string, any> => {
+    const parts = val.trim().split(/\s+/).map(cleanStyleValue);
+    const styles: any = {};
+    if (parts.length === 1) {
+      styles[prefix] = parts[0];
+    } else if (parts.length === 2) {
+      styles[`${prefix}Vertical`] = parts[0];
+      styles[`${prefix}Horizontal`] = parts[1];
+    } else if (parts.length === 3) {
+      styles[`${prefix}Top`] = parts[0];
+      styles[`${prefix}Horizontal`] = parts[1];
+      styles[`${prefix}Bottom`] = parts[2];
+    } else if (parts.length === 4) {
+      styles[`${prefix}Top`] = parts[0];
+      styles[`${prefix}Right`] = parts[1];
+      styles[`${prefix}Bottom`] = parts[2];
+      styles[`${prefix}Left`] = parts[3];
+    }
+    return styles;
+  };
+
+  const mapCssToRn = (prop: string, val: string): Record<string, any> => {
+    const key = prop.trim().toLowerCase();
+    const rawValue = val.trim();
+    const styles: any = {};
+
+    switch (key) {
+      case 'background-color':
+      case 'backgroundcolor':
+        styles.backgroundColor = rawValue;
+        break;
+      case 'color':
+        styles.color = rawValue;
+        break;
+      case 'font-size':
+      case 'fontsize':
+        styles.fontSize = parseFloat(rawValue);
+        break;
+      case 'font-weight':
+      case 'fontweight':
+        styles.fontWeight = rawValue;
+        break;
+      case 'font-style':
+      case 'fontstyle':
+        styles.fontStyle = rawValue;
+        break;
+      case 'text-align':
+      case 'textalign':
+        styles.textAlign = rawValue;
+        break;
+      case 'display':
+        if (rawValue === 'flex') styles.display = 'flex';
+        break;
+      case 'flex-direction':
+      case 'flexdirection':
+        styles.flexDirection = rawValue;
+        break;
+      case 'justify-content':
+      case 'justifycontent':
+        styles.justifyContent = rawValue;
+        break;
+      case 'align-items':
+      case 'alignitems':
+        styles.alignItems = rawValue;
+        break;
+      case 'flex-wrap':
+      case 'flexwrap':
+        styles.flexWrap = rawValue;
+        break;
+      case 'gap':
+        styles.gap = parseFloat(rawValue);
+        break;
+      case 'flex':
+        styles.flex = parseFloat(rawValue);
+        break;
+      case 'width':
+        styles.width = cleanStyleValue(rawValue);
+        break;
+      case 'height':
+        styles.height = cleanStyleValue(rawValue);
+        break;
+      case 'min-width':
+      case 'minwidth':
+        styles.minWidth = cleanStyleValue(rawValue);
+        break;
+      case 'min-height':
+      case 'minheight':
+        styles.minHeight = cleanStyleValue(rawValue);
+        break;
+      case 'max-width':
+      case 'maxwidth':
+        styles.maxWidth = cleanStyleValue(rawValue);
+        break;
+      case 'max-height':
+      case 'maxheight':
+        styles.maxHeight = cleanStyleValue(rawValue);
+        break;
+      case 'margin':
+        return parseShorthand(rawValue, 'margin');
+      case 'margin-top':
+      case 'margintop':
+        styles.marginTop = parseFloat(rawValue);
+        break;
+      case 'margin-bottom':
+      case 'marginbottom':
+        styles.marginBottom = parseFloat(rawValue);
+        break;
+      case 'margin-left':
+      case 'marginleft':
+        styles.marginLeft = parseFloat(rawValue);
+        break;
+      case 'margin-right':
+      case 'marginright':
+        styles.marginRight = parseFloat(rawValue);
+        break;
+      case 'padding':
+        return parseShorthand(rawValue, 'padding');
+      case 'padding-top':
+      case 'paddingtop':
+        styles.paddingTop = parseFloat(rawValue);
+        break;
+      case 'padding-bottom':
+      case 'paddingbottom':
+        styles.paddingBottom = parseFloat(rawValue);
+        break;
+      case 'padding-left':
+      case 'paddingleft':
+        styles.paddingLeft = parseFloat(rawValue);
+        break;
+      case 'padding-right':
+      case 'paddingright':
+        styles.paddingRight = parseFloat(rawValue);
+        break;
+      case 'border-radius':
+      case 'borderradius':
+        styles.borderRadius = parseFloat(rawValue);
+        break;
+      case 'border-width':
+      case 'borderwidth':
+        styles.borderWidth = parseFloat(rawValue);
+        break;
+      case 'border-color':
+      case 'bordercolor':
+        styles.borderColor = rawValue;
+        break;
+      case 'border':
+        const borderParts = rawValue.split(/\s+/);
+        borderParts.forEach((part) => {
+          if (part.endsWith('px')) {
+            styles.borderWidth = parseFloat(part);
+          } else if (part.startsWith('#') || part.startsWith('rgb') || ['red', 'blue', 'green', 'black', 'white', 'gray'].includes(part)) {
+            styles.borderColor = part;
+          }
+        });
+        break;
+    }
+    return styles;
+  };
+
   // Helper: CSS Style parser
   const parseCSS = (cssText: string): CSSStyles => {
     const styles: CSSStyles = {};
     try {
+      const cleanCss = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
       const ruleRegex = /([^{]+)\s*\{\s*([^}]+)\s*\}/g;
       let match;
-      while ((match = ruleRegex.exec(cssText)) !== null) {
+      while ((match = ruleRegex.exec(cleanCss)) !== null) {
         const selector = match[1].trim();
         const declsText = match[2].trim();
         const declarations = declsText.split(';');
@@ -105,39 +284,7 @@ export const BrowserScreen: React.FC = () => {
           const [prop, val] = decl.split(':').map((s) => s.trim());
           if (!prop || !val) return;
 
-          switch (prop.toLowerCase()) {
-            case 'background-color':
-              ruleStyles.backgroundColor = val;
-              break;
-            case 'color':
-              ruleStyles.color = val;
-              break;
-            case 'font-size':
-              ruleStyles.fontSize = parseInt(val, 10);
-              break;
-            case 'font-weight':
-              ruleStyles.fontWeight = val === 'bold' ? 'bold' : 'normal';
-              break;
-            case 'margin-bottom':
-              ruleStyles.marginBottom = parseInt(val, 10);
-              break;
-            case 'margin-top':
-              ruleStyles.marginTop = parseInt(val, 10);
-              break;
-            case 'line-height':
-              ruleStyles.lineHeight = parseFloat(val) * 12; // relative multiplier scale
-              break;
-            case 'padding':
-              ruleStyles.padding = parseInt(val, 10);
-              break;
-            case 'border-radius':
-              ruleStyles.borderRadius = parseInt(val, 10);
-              break;
-            case 'border':
-              ruleStyles.borderWidth = 1;
-              ruleStyles.borderColor = val.includes('#') ? '#' + val.split('#')[1].substring(0, 6) : '#cccccc';
-              break;
-          }
+          Object.assign(ruleStyles, mapCssToRn(prop, val));
         });
         styles[selector] = ruleStyles;
       }
@@ -147,48 +294,176 @@ export const BrowserScreen: React.FC = () => {
     return styles;
   };
 
-  // Helper: Simple body parser that converts tags to list of elements
-  const parseBodyElements = (bodyHtml: string): ParsedElement[] => {
-    const elements: ParsedElement[] = [];
-    try {
-      // Regex matches nested tag elements like <h1>text</h1>, <div class="card">...</div>, etc.
-      const tagRegex = /<(\w+)([^>]*)>([\s\S]*?)<\/\1>/g;
-      let match;
-      while ((match = tagRegex.exec(bodyHtml)) !== null) {
-        const tag = match[1].toLowerCase();
-        const attribs = match[2];
-        const content = match[3];
-
-        const classMatch = attribs.match(/class=["']([^"']+)["']/);
-        const styleMatch = attribs.match(/style=["']([^"']+)["']/);
-
-        const className = classMatch ? classMatch[1] : '';
-        const inlineStyle = styleMatch ? styleMatch[1] : '';
-
-        // Recursively look for children if inside a div/container
-        let children: ParsedElement[] = [];
-        if (tag === 'div') {
-          children = parseBodyElements(content);
-        }
-
-        elements.push({
-          tag,
-          content: content.replace(/<[^>]+>/g, '').trim(), // strip nested text tags for simple render
-          className,
-          inlineStyle,
-          children,
-        });
+  // Upgraded HTML AST Tree Tokenizer & Parser
+  const tokenizeHTML = (html: string) => {
+    const tokens: { type: 'tag' | 'text'; value: string }[] = [];
+    const regex = /(<[^>]+>)/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      const text = html.substring(lastIndex, match.index).trim();
+      if (text) {
+        tokens.push({ type: 'text', value: text });
       }
-    } catch (e) {
-      console.warn('Failed parsing local HTML body tags', e);
+      tokens.push({ type: 'tag', value: match[0] });
+      lastIndex = regex.lastIndex;
     }
-    return elements;
+    const remainingText = html.substring(lastIndex).trim();
+    if (remainingText) {
+      tokens.push({ type: 'text', value: remainingText });
+    }
+    return tokens;
+  };
+
+  const parseTokens = (tokens: { type: 'tag' | 'text'; value: string }[]): ParsedElement[] => {
+    const root: ParsedElement = { tag: 'root', content: '', className: '', inlineStyle: '', attributes: {}, children: [] };
+    const stack: ParsedElement[] = [root];
+
+    for (const token of tokens) {
+      if (token.type === 'text') {
+        const current = stack[stack.length - 1];
+        if (current) {
+          current.children.push({
+            tag: 'text-node',
+            content: token.value,
+            className: '',
+            inlineStyle: '',
+            attributes: {},
+            children: []
+          });
+        }
+      } else if (token.type === 'tag') {
+        const tagStr = token.value;
+        if (tagStr.startsWith('<!--')) {
+          continue;
+        }
+        if (tagStr.startsWith('</')) {
+          const tagName = tagStr.substring(2, tagStr.length - 1).trim().toLowerCase();
+          let foundIdx = -1;
+          for (let i = stack.length - 1; i >= 1; i--) {
+            if (stack[i].tag === tagName) {
+              foundIdx = i;
+              break;
+            }
+          }
+          if (foundIdx !== -1) {
+            stack.length = foundIdx;
+          } else {
+            if (stack.length > 1) {
+              stack.pop();
+            }
+          }
+        } else {
+          const isSelfClosing = tagStr.endsWith('/>') || ['img', 'br', 'input', 'hr', 'meta', 'link'].includes(
+            tagStr.match(/^<(\w+)/)?.[1]?.toLowerCase() || ''
+          );
+          const insideMatch = tagStr.match(/^<(\w+)([\s\S]*?)>?$/);
+          if (insideMatch) {
+            const tagName = insideMatch[1].toLowerCase();
+            const attrStr = insideMatch[2].trim();
+
+            const attributes: Record<string, string> = {};
+            const attrRegex = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g;
+            let attrMatch;
+            while ((attrMatch = attrRegex.exec(attrStr)) !== null) {
+              const name = attrMatch[1].toLowerCase();
+              const val = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4];
+              attributes[name] = val;
+            }
+
+            const className = attributes['class'] || '';
+            const inlineStyle = attributes['style'] || '';
+
+            const newEl: ParsedElement = {
+              tag: tagName,
+              content: '',
+              className,
+              inlineStyle,
+              attributes,
+              children: []
+            };
+
+            const current = stack[stack.length - 1];
+            if (current) {
+              current.children.push(newEl);
+            }
+
+            if (!isSelfClosing) {
+              stack.push(newEl);
+            }
+          }
+        }
+      }
+    }
+
+    return root.children;
+  };
+
+  // Sub-component for Writable Interactive Text Inputs in the local HTML page
+  const LocalInteractiveInput: React.FC<{ el: ParsedElement; colors: any; style: any }> = ({ el, colors, style }) => {
+    const type = el.attributes['type'] || 'text';
+    const placeholder = el.attributes['placeholder'] || '';
+    const [val, setVal] = useState(el.attributes['value'] || '');
+
+    return (
+      <TextInput
+        style={[
+          {
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderWidth: 1,
+            borderRadius: 8,
+            fontSize: 13,
+            minWidth: 120,
+          },
+          style,
+        ]}
+        value={val}
+        onChangeText={setVal}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textTertiary}
+        multiline={el.tag === 'textarea'}
+        secureTextEntry={type === 'password'}
+      />
+    );
+  };
+
+  // Sub-component for Writable Interactive Button in the local HTML page
+  const LocalInteractiveButton: React.FC<{ el: ParsedElement; style: any; colors: any; onClick: () => void }> = ({ el, style, colors, onClick }) => {
+    return (
+      <TouchableOpacity
+        style={[
+          {
+            paddingVertical: 8,
+            paddingHorizontal: 16,
+            borderRadius: 8,
+            alignSelf: 'flex-start',
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+          style,
+        ]}
+        onPress={onClick}
+        activeOpacity={0.8}
+      >
+        <Text style={{ color: style.color || '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+          {el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : 'Button')}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   // Render Local Server Website Parser
   const renderLocalServer = () => {
-    // Find index.html or first HTML file in workspace
-    const htmlFile = files.find((f) => f.name.endsWith('.html')) || files.find((f) => f.language === 'html');
+    // Determine the requested file name from the URL path for Local Multi-Page Router
+    const urlPath = browserUrl.replace(/^https?:\/\/localhost:3000\/?/, '').trim();
+    const targetFileName = urlPath || 'index.html';
+
+    // Find requested HTML file in workspace
+    const htmlFile = files.find((f) => f.name.toLowerCase() === targetFileName.toLowerCase()) ||
+                     files.find((f) => f.name.endsWith('.html')) ||
+                     files.find((f) => f.language === 'html');
+
     if (!htmlFile || !htmlFile.content) {
       return (
         <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
@@ -215,7 +490,9 @@ export const BrowserScreen: React.FC = () => {
     const bodyMatch = htmlFile.content.match(/<body>([\s\S]*?)<\/body>/);
     const bodyHtml = bodyMatch ? bodyMatch[1] : htmlFile.content;
 
-    const parsedElements = parseBodyElements(bodyHtml);
+    // Use our advanced recursive tree tokenizer and parser
+    const tokens = tokenizeHTML(bodyHtml);
+    const parsedElements = parseTokens(tokens);
 
     // Dynamic style applier helper
     const getStylesForElement = (el: ParsedElement) => {
@@ -226,25 +503,194 @@ export const BrowserScreen: React.FC = () => {
         finalStyle = { ...finalStyle, ...cssRules[el.tag] };
       }
       // 2. Class style
-      if (el.className && cssRules['.' + el.className]) {
-        finalStyle = { ...finalStyle, ...cssRules['.' + el.className] };
+      if (el.className) {
+        el.className.split(/\s+/).forEach((cls) => {
+          const classSelector = '.' + cls.trim();
+          if (cssRules[classSelector]) {
+            finalStyle = { ...finalStyle, ...cssRules[classSelector] };
+          }
+        });
       }
-      // 3. Inline style parser overrides
+      // 3. ID selector style
+      const idAttr = el.attributes['id'];
+      if (idAttr) {
+        const idSelector = '#' + idAttr.trim();
+        if (cssRules[idSelector]) {
+          finalStyle = { ...finalStyle, ...cssRules[idSelector] };
+        }
+      }
+      // 4. Inline style parser overrides
       if (el.inlineStyle) {
         el.inlineStyle.split(';').forEach((s) => {
-          const parts = s.split(':');
-          if (parts.length === 2) {
-            const prop = parts[0].trim();
-            const val = parts[1].trim();
-            if (prop === 'color') finalStyle.color = val;
-            if (prop === 'background-color') finalStyle.backgroundColor = val;
-            if (prop === 'font-size') finalStyle.fontSize = parseInt(val, 10);
-            if (prop === 'font-weight') finalStyle.fontWeight = val === 'bold' ? 'bold' : 'normal';
+          if (!s.trim()) return;
+          const [prop, val] = s.split(':').map((p) => p.trim());
+          if (prop && val) {
+            Object.assign(finalStyle, mapCssToRn(prop, val));
           }
         });
       }
 
       return finalStyle;
+    };
+
+    // Recursive component to render elements of any depth
+    const RenderElement: React.FC<{ el: ParsedElement; index: number }> = ({ el, index }) => {
+      const elStyle = getStylesForElement(el);
+
+      if (el.tag === 'text-node') {
+        return (
+          <Text key={index} style={[{ color: colors.text }, elStyle]}>
+            {el.content}
+          </Text>
+        );
+      }
+
+      // Interactive Writable Input & Textarea
+      if (el.tag === 'input' || el.tag === 'textarea') {
+        return (
+          <LocalInteractiveInput
+            key={index}
+            el={el}
+            colors={colors}
+            style={elStyle}
+          />
+        );
+      }
+
+      // Live remote / local Image tag
+      if (el.tag === 'img') {
+        const src = el.attributes['src'] || 'https://picsum.photos/200/150';
+        const alt = el.attributes['alt'] || 'image';
+        return (
+          <Image
+            key={index}
+            source={{ uri: src }}
+            style={[{ width: 200, height: 150, borderRadius: 8 }, elStyle]}
+            alt={alt}
+          />
+        );
+      }
+
+      // Bullet / ordered list
+      if (el.tag === 'ul' || el.tag === 'ol') {
+        return (
+          <View key={index} style={[{ paddingLeft: 12 }, elStyle]}>
+            {el.children.map((child, idx) => {
+              if (child.tag === 'li') {
+                const childStyle = getStylesForElement(child);
+                return (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginVertical: 2 }}>
+                    <Text style={{ marginRight: 6, color: colors.primary, fontWeight: 'bold' }}>
+                      {el.tag === 'ol' ? `${idx + 1}.` : '•'}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <RenderElement el={child} index={idx} />
+                    </View>
+                  </View>
+                );
+              }
+              return <RenderElement key={idx} el={child} index={idx} />;
+            })}
+          </View>
+        );
+      }
+
+      // Anchor Links supporting Local Multi-page Routing
+      if (el.tag === 'a') {
+        const href = el.attributes['href'] || '';
+        return (
+          <TouchableOpacity
+            key={index}
+            onPress={() => {
+              if (href.startsWith('http://') || href.startsWith('https://')) {
+                handleNavigation(href);
+              } else if (href) {
+                const cleanHref = href.startsWith('/') ? href.substring(1) : href;
+                handleNavigation(`http://localhost:3000/${cleanHref}`);
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[{ color: colors.primary, textDecorationLine: 'underline' }, elStyle]}>
+              {el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : href)}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
+
+      // Writable/Clickable Buttons
+      if (el.tag === 'button') {
+        return (
+          <LocalInteractiveButton
+            key={index}
+            el={el}
+            colors={colors}
+            style={elStyle}
+            onClick={() => {
+              setButtonClicks((c) => c + 1);
+              Alert.alert(
+                'Live Interaction',
+                `Clicked button: "${el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : 'Button')}"\nTotal Interactions: ${buttonClicks + 1}`
+              );
+            }}
+          />
+        );
+      }
+
+      // Division structures & layout boxes
+      if (['div', 'section', 'footer', 'main', 'nav', 'header', 'aside', 'li'].includes(el.tag)) {
+        return (
+          <View key={index} style={elStyle}>
+            {el.children.map((child, idx) => (
+              <RenderElement key={idx} el={child} index={idx} />
+            ))}
+            {!el.children.length && el.content ? (
+              <Text style={{ color: colors.text }}>{el.content}</Text>
+            ) : null}
+          </View>
+        );
+      }
+
+      // Standard browser headings
+      if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(el.tag)) {
+        let baseFontSize = 14;
+        if (el.tag === 'h1') baseFontSize = 24;
+        else if (el.tag === 'h2') baseFontSize = 20;
+        else if (el.tag === 'h3') baseFontSize = 18;
+        else if (el.tag === 'h4') baseFontSize = 16;
+
+        return (
+          <Text
+            key={index}
+            style={[
+              { fontSize: baseFontSize, fontWeight: 'bold', marginBottom: 6 },
+              elStyle,
+            ]}
+          >
+            {el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : '')}
+          </Text>
+        );
+      }
+
+      // Paragraph elements
+      if (el.tag === 'p') {
+        return (
+          <Text key={index} style={[{ fontSize: 14, lineHeight: 20, marginBottom: 8 }, elStyle]}>
+            {el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : '')}
+          </Text>
+        );
+      }
+
+      // Span text nodes
+      if (el.tag === 'span') {
+        return (
+          <Text key={index} style={[{ color: colors.text }, elStyle]}>
+            {el.content || (el.children.length > 0 ? el.children.map(c => c.content).join('') : '')}
+          </Text>
+        );
+      }
+
+      return null;
     };
 
     return (
@@ -259,89 +705,13 @@ export const BrowserScreen: React.FC = () => {
 
         {/* Dynamic elements mapper */}
         <View style={styles.localWebContainer}>
-          {parsedElements.map((el, index) => {
-            const elStyle = getStylesForElement(el);
-
-            if (el.tag === 'h1') {
-              return (
-                <Text key={index} style={[styles.localH1, elStyle]}>
-                  {el.content}
-                </Text>
-              );
-            }
-            if (el.tag === 'h2' || el.tag === 'h3') {
-              return (
-                <Text key={index} style={[styles.localH2, elStyle]}>
-                  {el.content}
-                </Text>
-              );
-            }
-            if (el.tag === 'p') {
-              return (
-                <Text key={index} style={[styles.localP, elStyle]}>
-                  {el.content}
-                </Text>
-              );
-            }
-            if (el.tag === 'button') {
-              return (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.localButton, elStyle]}
-                  onPress={() => {
-                    setButtonClicks((c) => c + 1);
-                    Alert.alert(
-                      'Live Interaction',
-                      `You successfully clicked the "${el.content}" button!\nTotal Interactions: ${buttonClicks + 1}`
-                    );
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.localButtonText}>{el.content}</Text>
-                </TouchableOpacity>
-              );
-            }
-            if (el.tag === 'div') {
-              const divStyle = getStylesForElement(el);
-              return (
-                <View key={index} style={[styles.localDiv, divStyle]}>
-                  {el.children.map((child, cIndex) => {
-                    const childStyle = getStylesForElement(child);
-                    if (child.tag === 'h3') {
-                      return <Text key={cIndex} style={[styles.localH2, childStyle]}>{child.content}</Text>;
-                    }
-                    if (child.tag === 'p') {
-                      return <Text key={cIndex} style={[styles.localP, childStyle]}>{child.content}</Text>;
-                    }
-                    if (child.tag === 'button') {
-                      return (
-                        <TouchableOpacity
-                          key={cIndex}
-                          style={[styles.localButton, childStyle]}
-                          onPress={() => {
-                            setButtonClicks((c) => c + 1);
-                            Alert.alert(
-                              'Live Interaction',
-                              `Clicked inside div: "${child.content}"`
-                            );
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.localButtonText}>{child.content}</Text>
-                        </TouchableOpacity>
-                      );
-                    }
-                    return null;
-                  })}
-                </View>
-              );
-            }
-            return null;
-          })}
+          {parsedElements.map((el, index) => (
+            <RenderElement key={index} el={el} index={index} />
+          ))}
         </View>
       </View>
     );
-  };
+  };;
 
   const renderSimulatedPage = () => {
     const domain = getDomainName(browserUrl).toLowerCase();

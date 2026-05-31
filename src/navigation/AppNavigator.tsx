@@ -13,7 +13,9 @@ const Tab = createBottomTabNavigator();
 
 export const AppNavigator: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const _COLORS = COLORS;
+  const _dark = _COLORS ? (darkMode ? _COLORS.dark : _COLORS.light) : { primary: '#14B8A6', surface: '#1E293B', border: '#334155', textTertiary: '#64748B', text: '#F8FAFC' };
+  const colors = _dark;
 
   return (
     <Tab.Navigator

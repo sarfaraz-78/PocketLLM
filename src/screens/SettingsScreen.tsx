@@ -365,12 +365,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#334155',
   },
   hardwareRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
     marginBottom: SPACING.xs,
   },
   hardwareText: {
@@ -385,7 +384,7 @@ const styles = StyleSheet.create({
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    marginLeft: SPACING.md,
   },
   settingIcon: {
     width: 36,

@@ -20,7 +20,9 @@ export const OnboardingScreen: React.FC<{ navigation: any }> = ({
   const [deviceProfile, setDeviceProfile] = useState<DeviceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const { setDeviceTier, setOnboardingComplete, darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const _COLORS = COLORS;
+  const _defaultColors = { primary: '#14B8A6', surface: '#1E293B', background: '#0F172A', border: '#334155', textTertiary: '#64748B', text: '#F8FAFC', textSecondary: '#CBD5E1', divider: '#1E293B', primaryLight: '#5EEAD4', primaryDark: '#0D9488', secondary: '#22D3EE', accent: '#FBBF24', surfaceVariant: '#334155', surfaceElevated: '#1E293B', error: '#F87171', success: '#34D399', warning: '#FBBF24', info: '#60A5FA', userBubble: '#14B8A6', assistantBubble: '#334155', userBubbleText: '#FFFFFF', assistantBubbleText: '#F8FAFC', inputBackground: '#1E293B', overlay: 'rgba(0, 0, 0, 0.6)', gradientStart: '#14B8A6', gradientEnd: '#22D3EE' };
+  const colors = _COLORS ? (_COLORS[darkMode ? 'dark' : 'light']) : _defaultColors;
 
   useEffect(() => {
     detectDevice();

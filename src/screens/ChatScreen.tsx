@@ -11,6 +11,7 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -18,6 +19,7 @@ import { useChatStore } from '../store/useChatStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useModelStore } from '../store/useModelStore';
 import { useHistoryStore } from '../store/useHistoryStore';
+import { useWorkspaceStore } from '../store/useWorkspaceStore';
 import { llamaEngine } from '../inference/LlamaEngine';
 import { simpleTTS } from '../services/SimpleTTS';
 import { getVoiceById } from '../services/VoiceManager';
@@ -29,6 +31,20 @@ import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
 import { ChatMessage } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const getFileIconName = (fileName: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  switch (ext) {
+    case 'js': return 'logo-javascript';
+    case 'ts': return 'logo-typescript';
+    case 'py': return 'logo-python';
+    case 'md': return 'document-text';
+    case 'json': return 'code-working';
+    case 'html': return 'logo-html5';
+    case 'css': return 'logo-css3';
+    default: return 'document-outline';
+  }
+};
 
 export const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
@@ -42,7 +58,18 @@ export const ChatScreen: React.FC = () => {
     clearMessages,
   } = useChatStore();
   const { activeModel } = useModelStore();
-  const { systemPrompt, completionSettings, darkMode, enableThinking, codingMode, setEnableThinking, ttsVoiceId, setTTSVoiceId } = useSettingsStore();
+  const { files } = useWorkspaceStore();
+  const {
+    systemPrompt,
+    completionSettings,
+    darkMode,
+    enableThinking,
+    codingMode,
+    setEnableThinking,
+    setCodingMode,
+    ttsVoiceId,
+    setTTSVoiceId,
+  } = useSettingsStore();
   const { saveCurrentConversation } = useHistoryStore();
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -122,8 +149,20 @@ export const ChatScreen: React.FC = () => {
     try {
       const codingModeTools = codingMode ? ' Tools: terminal (cmd), ide_write, ide_read, ide_delete, ide_list, browser_open. When user asks to execute commands, write code, or open URLs, use these tools by including ```tool\n{"tool": "name", "args": {...}}\n``` in your response.' : '';
 
+      let workspaceContext = '';
+      if (codingMode) {
+        const workspaceFiles = useWorkspaceStore.getState().files;
+        const textFiles = workspaceFiles.filter((f) => f.type === 'file' && f.content);
+        if (textFiles.length > 0) {
+          workspaceContext = '\n\n[Active Workspace Files (You can modify these or create new ones using ide_write)]:\n' + 
+            textFiles.map((f) => `--- File: ${f.name} ---\n${f.content}`).join('\n\n') + '\n\n';
+        } else {
+          workspaceContext = '\n\n[Active Workspace]: (Empty)\n\n';
+        }
+      }
+
       const messageHistory = [
-        { role: 'system' as const, content: systemPrompt + codingModeTools },
+        { role: 'system' as const, content: systemPrompt + codingModeTools + workspaceContext },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: userMessage },
       ];
@@ -255,6 +294,39 @@ export const ChatScreen: React.FC = () => {
           darkMode={darkMode}
         />
 
+        {codingMode && files.length > 0 && (
+          <View style={[styles.hudContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+            <View style={styles.hudHeader}>
+              <View style={styles.hudTitleRow}>
+                <Icon name="folder-open-outline" size={13} color={colors.primary} />
+                <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>ACTIVE WORKSPACE</Text>
+              </View>
+              <Text style={[styles.hudFileCount, { color: colors.textTertiary }]}>
+                {files.length} {files.length === 1 ? 'file' : 'files'}
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hudScroll}>
+              {files.map((file) => (
+                <TouchableOpacity
+                  key={file.id}
+                  style={[styles.hudFileBadge, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={() => {
+                    Alert.alert(
+                      `File: ${file.name}`,
+                      file.content ? file.content.substring(0, 1000) + (file.content.length > 1000 ? '\n\n... (truncated)' : '') : '(Empty File)',
+                      [{ text: 'Close', style: 'cancel' }]
+                    );
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Icon name={getFileIconName(file.name)} size={12} color={colors.primary} />
+                  <Text style={[styles.hudFileName, { color: colors.text }]}>{file.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {messages.length === 0 ? (
           renderEmptyState()
         ) : (
@@ -270,6 +342,24 @@ export const ChatScreen: React.FC = () => {
         )}
 
         <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              { backgroundColor: codingMode ? colors.primary + '15' : colors.surfaceVariant },
+            ]}
+            onPress={() => setCodingMode(!codingMode)}
+            activeOpacity={0.8}
+          >
+            <Icon
+              name={codingMode ? 'code-slash' : 'code-slash-outline'}
+              size={15}
+              color={codingMode ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.actionText, { color: codingMode ? colors.primary : colors.textSecondary }]}>
+              Coding Mode
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.actionBtn,
@@ -424,6 +514,48 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+  hudContainer: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderBottomWidth: 1,
+  },
+  hudHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  hudTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hudTitle: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  hudFileCount: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  hudScroll: {
+    gap: SPACING.sm,
+    paddingVertical: 2,
+  },
+  hudFileBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: SPACING.md,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  hudFileName: {
+    fontSize: 11,
     fontWeight: '600',
   },
 });

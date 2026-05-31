@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput } from 'react-native';
 import RNSlider from '@react-native-community/slider';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../theme';
 
@@ -25,17 +25,48 @@ export const Slider: React.FC<SliderProps> = ({
   darkMode = true,
 }) => {
   const colors = darkMode ? COLORS.dark : COLORS.light;
+  const [inputValue, setInputValue] = useState(value.toString());
 
-  const displayValue = formatValue ? formatValue(value) : value.toString();
+  // Sync state if value changes from outside (like dragging the slider or resetting)
+  useEffect(() => {
+    setInputValue(formatValue ? formatValue(value) : value.toString());
+  }, [value, formatValue]);
+
+  const handleTextChange = (text: string) => {
+    setInputValue(text);
+    const parsed = parseFloat(text);
+    if (!isNaN(parsed)) {
+      // Clamp value within bounds
+      const clamped = Math.max(min, Math.min(max, parsed));
+      onChange(clamped);
+    }
+  };
+
+  const handleBlur = () => {
+    const parsed = parseFloat(inputValue);
+    if (isNaN(parsed)) {
+      setInputValue(value.toString());
+    } else {
+      const clamped = Math.max(min, Math.min(max, parsed));
+      setInputValue(formatValue ? formatValue(clamped) : clamped.toString());
+      onChange(clamped);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-        <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12' }]}>
-          <Text style={[styles.valueText, { color: colors.primary }]}>
-            {displayValue}
-          </Text>
+        <View style={[styles.valueBadge, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '25', borderWidth: 1 }]}>
+          <TextInput
+            style={[styles.valueInput, { color: colors.primary }]}
+            value={inputValue}
+            onChangeText={handleTextChange}
+            onBlur={handleBlur}
+            keyboardType="numeric"
+            selectTextOnFocus
+            underlineColorAndroid="transparent"
+          />
         </View>
       </View>
       <RNSlider
@@ -44,8 +75,10 @@ export const Slider: React.FC<SliderProps> = ({
         maximumValue={max}
         step={step}
         value={value}
-        onValueChange={onChange}
-        onSlidingComplete={onChange}
+        onValueChange={(val) => {
+          onChange(val);
+          setInputValue(formatValue ? formatValue(val) : val.toString());
+        }}
         minimumTrackTintColor={colors.primary}
         maximumTrackTintColor={colors.border}
         thumbTintColor={colors.primary}
@@ -69,13 +102,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   valueBadge: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 2,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 1,
     borderRadius: BORDER_RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  valueText: {
+  valueInput: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
+    padding: 0,
+    minWidth: 42,
+    textAlign: 'center',
   },
   slider: {
     width: '100%',

@@ -327,6 +327,7 @@ export class LlamaEngine {
         penalty_present: settings.penalty_present,
         stop: STOP_WORDS,
         enable_thinking: enableThinking ?? true,
+        cache_prompt: true, // Cache reuse across dialogue turns
       };
 
       // Check multimodal support

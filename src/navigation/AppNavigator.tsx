@@ -8,13 +8,13 @@ import { ModelListScreen } from '../screens/ModelListScreen';
 import { ConversationListScreen } from '../screens/ConversationListScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS, SPACING, BORDER_RADIUS } from '../theme';
+import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES } from '../theme';
 
 const Tab = createBottomTabNavigator();
 
-const TabIcon: React.FC<{ name: string; focused: boolean; color: string }> = ({ name, focused, color }) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-    <Icon name={name} size={22} color={color} />
+const TabIcon: React.FC<{ name: string; focused: boolean; color: string; primaryColor: string }> = ({ name, focused, color, primaryColor }) => (
+  <View style={[styles.iconContainer, focused && { backgroundColor: primaryColor + '18' }]}>
+    <Icon name={name} size={20} color={color} />
   </View>
 );
 
@@ -30,15 +30,16 @@ export const AppNavigator: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 70,
+          height: Platform.OS === 'ios' ? 76 : 64,
           paddingBottom: Platform.OS === 'ios' ? SPACING.lg : SPACING.sm,
-          paddingTop: SPACING.sm,
+          paddingTop: SPACING.xs,
           borderTopWidth: 1,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '600',
-          marginTop: 2,
+          fontSize: FONT_SIZES.xs,
+          fontWeight: '700',
+          marginTop: 0,
         },
         headerShown: false,
       }}
@@ -48,7 +49,7 @@ export const AppNavigator: React.FC = () => {
         component={ChatScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "chatbubbles" : "chatbubbles-outline"} focused={focused} color={color} />
+            <TabIcon name={focused ? "chatbubbles" : "chatbubbles-outline"} focused={focused} color={color} primaryColor={colors.primary} />
           ),
         }}
       />
@@ -57,7 +58,7 @@ export const AppNavigator: React.FC = () => {
         component={WorkspaceScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "code-working" : "code-working-outline"} focused={focused} color={color} />
+            <TabIcon name={focused ? "code-working" : "code-working-outline"} focused={focused} color={color} primaryColor={colors.primary} />
           ),
         }}
       />
@@ -66,7 +67,7 @@ export const AppNavigator: React.FC = () => {
         component={ModelListScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "cube" : "cube-outline"} focused={focused} color={color} />
+            <TabIcon name={focused ? "cube" : "cube-outline"} focused={focused} color={color} primaryColor={colors.primary} />
           ),
         }}
       />
@@ -75,7 +76,7 @@ export const AppNavigator: React.FC = () => {
         component={ConversationListScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "time" : "time-outline"} focused={focused} color={color} />
+            <TabIcon name={focused ? "time" : "time-outline"} focused={focused} color={color} primaryColor={colors.primary} />
           ),
         }}
       />
@@ -84,7 +85,7 @@ export const AppNavigator: React.FC = () => {
         component={SettingsScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name={focused ? "settings" : "settings-outline"} focused={focused} color={color} />
+            <TabIcon name={focused ? "settings" : "settings-outline"} focused={focused} color={color} primaryColor={colors.primary} />
           ),
         }}
       />
@@ -94,13 +95,10 @@ export const AppNavigator: React.FC = () => {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 40,
+    width: 44,
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: BORDER_RADIUS.md,
-  },
-  iconContainerActive: {
-    backgroundColor: 'rgba(20, 184, 166, 0.1)',
   },
 });

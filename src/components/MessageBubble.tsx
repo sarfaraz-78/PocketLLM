@@ -10,9 +10,6 @@ interface MessageBubbleProps {
   darkMode: boolean;
 }
 
-const THINK_REGEX = /<think>([\s\S]*?)<\/think>/gi;
-const THINK_REGEX_ALT = /<think>([\s\S]*?)<\/think>/gi;
-
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   darkMode,
@@ -20,24 +17,31 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const isUser = message.role === 'user';
   const colors = darkMode ? COLORS.dark : COLORS.light;
   const attachments = message.attachments || [];
-  const [showThinking, setShowThinking] = useState(false);
+  const [showThinking, setShowThinking] = useState(true); // Default to showing thinking so it streams beautifully
 
   const content = message.content || ' ';
 
   let thinkingContent = '';
   let responseContent = content;
+  let isThinkingActive = false;
 
-  const thinkMatch = content.match(THINK_REGEX);
-  if (thinkMatch && thinkMatch.length > 0) {
-    const fullThink = thinkMatch[0];
-    thinkingContent = fullThink
-      .replace(/<think>/gi, '')
-      .replace(/<\/think>/gi, '')
-      .trim();
-    responseContent = content.replace(fullThink, '').trim();
+  if (content.includes('<think>')) {
+    const parts = content.split('<think>');
+    const thinkBody = parts[1] || '';
+    
+    if (thinkBody.includes('</think>')) {
+      const subParts = thinkBody.split('</think>');
+      thinkingContent = subParts[0].trim();
+      responseContent = (parts[0] + (subParts[1] || '')).trim();
+    } else {
+      // Actively thinking (no closing tag yet)
+      thinkingContent = thinkBody.trim();
+      responseContent = parts[0].trim();
+      isThinkingActive = true;
+    }
   }
 
-  const hasThinking = thinkingContent.length > 0;
+  const hasThinking = thinkingContent.length > 0 || isThinkingActive;
 
   return (
     <View
@@ -89,8 +93,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               >
                 <Icon name="bulb-outline" size={14} color={colors.primary} />
                 <Text style={[styles.thinkingToggleText, { color: colors.primary }]}>
-                  Show thinking ({thinkingContent.length} chars)
+                  {isThinkingActive ? 'Thinking in progress...' : `Show thoughts (${thinkingContent.length} chars)`}
                 </Text>
+                {isThinkingActive && <View style={[styles.pulseDot, { backgroundColor: colors.primary }]} />}
               </TouchableOpacity>
             )}
 
@@ -103,15 +108,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 >
                   <Icon name="bulb" size={14} color={colors.primary} />
                   <Text style={[styles.thinkingToggleText, { color: colors.primary }]}>
-                    Hide thinking
+                    Hide thoughts
                   </Text>
                 </TouchableOpacity>
                 <View style={[styles.thinkingContent, { backgroundColor: colors.primary + '08' }]}>
-                  <Text style={[styles.thinkingLabel, { color: colors.primary }]}>
-                    Thoughts
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={[styles.thinkingLabel, { color: colors.primary }]}>
+                      Thinking Process
+                    </Text>
+                    {isThinkingActive && (
+                      <Text style={{ fontSize: 9, color: colors.primary, fontWeight: '800', letterSpacing: 0.5 }}>
+                        ⚡ ACTIVE THINKING
+                      </Text>
+                    )}
+                  </View>
                   <Text style={[styles.thinkingText, { color: colors.textSecondary }]}>
-                    {thinkingContent}
+                    {thinkingContent || 'Formulating reasoning...'}
                   </Text>
                 </View>
               </View>
@@ -240,5 +252,11 @@ const styles = StyleSheet.create({
   thinkingText: {
     fontSize: FONT_SIZES.sm,
     lineHeight: 18,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginLeft: 4,
   },
 });

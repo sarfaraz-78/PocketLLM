@@ -6,6 +6,10 @@ export interface FileItem {
   type: 'file' | 'folder';
   content?: string;
   language?: string;
+  // v3.0: folder hierarchy
+  parentId?: string | null;
+  expanded?: boolean;
+  children?: string[];
 }
 
 export interface CommandHistory {
@@ -19,6 +23,13 @@ export interface Bookmark {
   id: string;
   title: string;
   url: string;
+}
+
+export interface BrowserHistoryEntry {
+  id: string;
+  url: string;
+  title: string;
+  visitedAt: number;
 }
 
 export interface GitCommit {
@@ -36,6 +47,7 @@ export interface Workspace {
   terminalHistory: CommandHistory[];
   browserUrl: string;
   bookmarks: Bookmark[];
+  browserHistory: BrowserHistoryEntry[];
   gitInitialized: boolean;
   gitStaged: string[];
   gitCommits: GitCommit[];
@@ -49,6 +61,7 @@ interface WorkspaceState {
   terminalHistory: CommandHistory[];
   browserUrl: string;
   bookmarks: Bookmark[];
+  browserHistory: BrowserHistoryEntry[];
   gitInitialized: boolean;
   gitStaged: string[];
   gitCommits: GitCommit[];
@@ -56,13 +69,20 @@ interface WorkspaceState {
   createWorkspace: (name: string, templateType?: 'blank' | 'glassmorphic' | 'profile' | 'chat') => string;
   switchWorkspace: (id: string) => void;
   deleteWorkspace: (id: string) => void;
-  addFile: (name: string, type: 'file' | 'folder', content?: string) => string;
+  addFile: (name: string, type: 'file' | 'folder', content?: string, parentId?: string | null) => string;
+  renameFile: (id: string, newName: string) => void;
+  moveFile: (id: string, newParentId: string | null) => void;
+  toggleFolder: (id: string) => void;
   updateFileContent: (id: string, content: string) => void;
   deleteFile: (id: string) => void;
   setActiveFileId: (id: string | null) => void;
   addTerminalCommand: (command: string, output: string) => void;
   clearTerminalHistory: () => void;
   setBrowserUrl: (url: string) => void;
+  addBrowserHistory: (entry: { url: string; title: string }) => void;
+  clearBrowserHistory: () => void;
+  exportBookmarks: () => string;
+  importBookmarks: (json: string) => number;
   resetWorkspaces: () => void;
   initGit: () => void;
   stageFile: (name: string) => boolean;
@@ -488,7 +508,7 @@ const initialBookmarks: Bookmark[] = [
   { id: '5', title: 'MDN', url: 'https://developer.mozilla.org' },
 ];
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaces: [
     {
       id: 'default',
@@ -497,6 +517,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: [],
       browserUrl: 'http://localhost:3000',
       bookmarks: initialBookmarks,
+      browserHistory: [],
       gitInitialized: false,
       gitStaged: [],
       gitCommits: [],
@@ -508,6 +529,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   terminalHistory: [],
   browserUrl: 'http://localhost:3000',
   bookmarks: initialBookmarks,
+  browserHistory: [],
   gitInitialized: false,
   gitStaged: [],
   gitCommits: [],
@@ -524,6 +546,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       bookmarks: [
         { id: '1', title: 'Local Server', url: 'http://localhost:3000' }
       ],
+      browserHistory: [],
       gitInitialized: false,
       gitStaged: [],
       gitCommits: [],
@@ -555,6 +578,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         terminalHistory: [],
         browserUrl: 'http://localhost:3000',
         bookmarks: newWorkspace.bookmarks,
+        browserHistory: [],
         gitInitialized: false,
         gitStaged: [],
         gitCommits: [],
@@ -593,6 +617,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: target.terminalHistory,
       browserUrl: target.browserUrl,
       bookmarks: target.bookmarks,
+      browserHistory: target.browserHistory ?? [],
       gitInitialized: target.gitInitialized ?? false,
       gitStaged: target.gitStaged ?? [],
       gitCommits: target.gitCommits ?? [],
@@ -612,13 +637,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       terminalHistory: state.activeWorkspaceId === id ? nextWorkspace.terminalHistory : state.terminalHistory,
       browserUrl: state.activeWorkspaceId === id ? nextWorkspace.browserUrl : state.browserUrl,
       bookmarks: state.activeWorkspaceId === id ? nextWorkspace.bookmarks : state.bookmarks,
+      browserHistory: state.activeWorkspaceId === id ? (nextWorkspace.browserHistory ?? []) : state.browserHistory,
       gitInitialized: state.activeWorkspaceId === id ? (nextWorkspace.gitInitialized ?? false) : state.gitInitialized,
       gitStaged: state.activeWorkspaceId === id ? (nextWorkspace.gitStaged ?? []) : state.gitStaged,
       gitCommits: state.activeWorkspaceId === id ? (nextWorkspace.gitCommits ?? []) : state.gitCommits,
     };
   }),
 
-  addFile: (name, type, content = '') => {
+  addFile: (name, type, content = '', parentId = null) => {
     const id = Date.now().toString();
     const newFile: FileItem = {
       id,
@@ -626,6 +652,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       type,
       language: type === 'file' ? getLanguageFromExt(name) : undefined,
       content: type === 'file' ? content : undefined,
+      parentId,
+      expanded: type === 'folder' ? true : undefined,
     };
     
     set((state) => {
@@ -645,6 +673,39 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     return id;
   },
 
+  renameFile: (id, newName) =>
+    set((state) => {
+      const updatedFiles = state.files.map((f) =>
+        f.id === id ? { ...f, name: newName.trim() } : f
+      );
+      const updatedWorkspaces = state.workspaces.map((w) =>
+        w.id === state.activeWorkspaceId ? { ...w, files: updatedFiles } : w
+      );
+      return { files: updatedFiles, workspaces: updatedWorkspaces };
+    }),
+
+  moveFile: (id, newParentId) =>
+    set((state) => {
+      const updatedFiles = state.files.map((f) =>
+        f.id === id ? { ...f, parentId: newParentId } : f
+      );
+      const updatedWorkspaces = state.workspaces.map((w) =>
+        w.id === state.activeWorkspaceId ? { ...w, files: updatedFiles } : w
+      );
+      return { files: updatedFiles, workspaces: updatedWorkspaces };
+    }),
+
+  toggleFolder: (id) =>
+    set((state) => {
+      const updatedFiles = state.files.map((f) =>
+        f.id === id && f.type === 'folder' ? { ...f, expanded: !f.expanded } : f
+      );
+      const updatedWorkspaces = state.workspaces.map((w) =>
+        w.id === state.activeWorkspaceId ? { ...w, files: updatedFiles } : w
+      );
+      return { files: updatedFiles, workspaces: updatedWorkspaces };
+    }),
+
   updateFileContent: (id, content) =>
     set((state) => {
       const updatedFiles = state.files.map((f) => (f.id === id ? { ...f, content } : f));
@@ -662,7 +723,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
 
   deleteFile: (id) =>
     set((state) => {
-      const updatedFiles = state.files.filter((f) => f.id !== id);
+      const toDelete = new Set<string>([id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const f of state.files) {
+          if (f.parentId && toDelete.has(f.parentId) && !toDelete.has(f.id)) {
+            toDelete.add(f.id);
+            changed = true;
+          }
+        }
+      }
+      const updatedFiles = state.files.filter((f) => !toDelete.has(f.id));
       const updatedWorkspaces = state.workspaces.map(w => {
         if (w.id === state.activeWorkspaceId) {
           return { ...w, files: updatedFiles };
@@ -672,7 +744,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       return {
         files: updatedFiles,
         workspaces: updatedWorkspaces,
-        activeFileId: state.activeFileId === id ? null : state.activeFileId,
+        activeFileId: state.activeFileId && toDelete.has(state.activeFileId) ? null : state.activeFileId,
       };
     }),
 
@@ -729,6 +801,55 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       };
     }),
 
+  addBrowserHistory: ({ url, title }) =>
+    set((state) => {
+      const entry: BrowserHistoryEntry = {
+        id: Date.now().toString(),
+        url,
+        title,
+        visitedAt: Date.now(),
+      };
+      const updated = [entry, ...state.browserHistory].slice(0, 100);
+      const updatedWorkspaces = state.workspaces.map((w) =>
+        w.id === state.activeWorkspaceId ? { ...w, browserHistory: updated } : w
+      );
+      return { browserHistory: updated, workspaces: updatedWorkspaces };
+    }),
+
+  clearBrowserHistory: () =>
+    set((state) => {
+      const updatedWorkspaces = state.workspaces.map((w) =>
+        w.id === state.activeWorkspaceId ? { ...w, browserHistory: [] } : w
+      );
+      return { browserHistory: [], workspaces: updatedWorkspaces };
+    }),
+
+  exportBookmarks: () => {
+    return JSON.stringify(get().bookmarks, null, 2);
+  },
+
+  importBookmarks: (json) => {
+    let count = 0;
+    set((state) => {
+      try {
+        const parsed = JSON.parse(json) as Array<{ title: string; url: string }>;
+        const newBookmarks: Bookmark[] = parsed.map((b) => ({
+          id: `imported_${Date.now()}_${count++}_${Math.random().toString(36).slice(2, 6)}`,
+          title: b.title,
+          url: b.url,
+        }));
+        const merged = [...state.bookmarks, ...newBookmarks];
+        const updatedWorkspaces = state.workspaces.map((w) =>
+          w.id === state.activeWorkspaceId ? { ...w, bookmarks: merged } : w
+        );
+        return { bookmarks: merged, workspaces: updatedWorkspaces };
+      } catch {
+        return {};
+      }
+    });
+    return count;
+  },
+
   resetWorkspaces: () => set({
     workspaces: [
       {
@@ -738,6 +859,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
         terminalHistory: [],
         browserUrl: 'http://localhost:3000',
         bookmarks: initialBookmarks,
+        browserHistory: [],
         gitInitialized: false,
         gitStaged: [],
         gitCommits: [],
@@ -749,6 +871,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     terminalHistory: [],
     browserUrl: 'http://localhost:3000',
     bookmarks: initialBookmarks,
+    browserHistory: [],
     gitInitialized: false,
     gitStaged: [],
     gitCommits: [],

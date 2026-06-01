@@ -11,7 +11,7 @@ interface MessageBubbleProps {
   darkMode: boolean;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({
+const MessageBubbleBase: React.FC<MessageBubbleProps> = ({
   message,
   darkMode,
 }) => {
@@ -188,6 +188,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     </View>
   );
 };
+
+const areMessagesEqual = (
+  prev: MessageBubbleProps,
+  next: MessageBubbleProps
+): boolean => {
+  return (
+    prev.message === next.message &&
+    prev.message.content === next.message.content &&
+    prev.message.isStreaming === next.message.isStreaming &&
+    prev.message.role === next.message.role &&
+    prev.message.timings === next.message.timings &&
+    prev.darkMode === next.darkMode
+  );
+};
+
+export const MessageBubble = React.memo(MessageBubbleBase, areMessagesEqual);
 
 const styles = StyleSheet.create({
   container: {

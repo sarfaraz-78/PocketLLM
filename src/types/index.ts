@@ -34,6 +34,18 @@ export interface ChatMessage {
   attachments?: Array<{ uri: string; type: 'image' | 'audio'; name?: string; duration?: number }>;
   ttsAudioUri?: string;
   ttsDuration?: number;
+  // v3.0: Conversation branching
+  branchId?: string;
+  parentMessageId?: string;
+  branchSiblings?: string[];
+}
+
+export interface ConversationBranch {
+  id: string;
+  parentMessageId: string;
+  createdAt: number;
+  active: boolean;
+  messageCount: number;
 }
 
 export interface ModelInfo {
@@ -64,6 +76,11 @@ export interface ModelInfo {
   };
   mmprojPath?: string;
   isMultimodal?: boolean;
+  // v3.0: User notes and ratings
+  userNote?: string;
+  userRating?: number;
+  lastUsedAt?: number;
+  useCount?: number;
 }
 
 export interface InferencePreset {

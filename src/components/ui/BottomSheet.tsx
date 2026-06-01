@@ -1,134 +1,187 @@
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
-  ScrollView,
+  Modal,
+  Pressable,
+  Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
+import { SPACING, RADIUS, FONT_SIZES, FONT_WEIGHTS, ELEVATION } from '../../theme/tokens';
 
 interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
-  subtitle?: string;
   children: React.ReactNode;
-  darkMode?: boolean;
+  height?: number | string;
+  showHandle?: boolean;
+  showClose?: boolean;
 }
 
-export const BottomSheet: React.FC<BottomSheetProps> = ({
+const BottomSheetBase: React.FC<BottomSheetProps> = ({
   visible,
   onClose,
   title,
-  subtitle,
   children,
-  darkMode = true,
+  height = '60%',
+  showHandle = true,
+  showClose = true,
 }) => {
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
+  const screenHeight = Dimensions.get('window').height;
+  const numericHeight =
+    typeof height === 'string'
+      ? (parseFloat(height) / 100) * screenHeight
+      : height;
+
+  const translateY = useRef(new Animated.Value(numericHeight)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+
+  const open = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: 0,
+        tension: 80,
+        friction: 11,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const close = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(translateY, {
+        toValue: numericHeight,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [numericHeight]);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.setValue(numericHeight);
+      backdropOpacity.setValue(0);
+      open();
+    }
+  }, [visible]);
 
   return (
     <Modal
-      visible={visible}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      visible={visible}
+      animationType="none"
+      onRequestClose={close}
+      statusBarTranslucent
     >
-      <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
-        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-          <View style={styles.handleContainer}>
-            <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          </View>
+      <View style={StyleSheet.absoluteFill}>
+        <Animated.View
+          style={[
+            styles.backdrop,
+            { opacity: backdropOpacity },
+          ]}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} />
+        </Animated.View>
 
-          {(title || subtitle) && (
-            <View style={styles.header}>
-              {title && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.kav}
+          pointerEvents="box-none"
+        >
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surfaceElevated,
+                height: numericHeight,
+                transform: [{ translateY }],
+              },
+              ELEVATION[4],
+            ]}
+          >
+            {showHandle && <View style={[styles.handle, { backgroundColor: colors.divider }]} />}
+
+            {(title || showClose) && (
+              <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-              )}
-              {subtitle && (
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                  {subtitle}
-                </Text>
-              )}
-            </View>
-          )}
+                {showClose && (
+                  <TouchableOpacity onPress={close} hitSlop={8}>
+                    <Icon name="close" size={22} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
-          <ScrollView
-            style={styles.content}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
-            {children}
-          </ScrollView>
-
-          <TouchableOpacity
-            style={[styles.closeBtn, { backgroundColor: colors.surfaceVariant }]}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.closeBtnText, { color: colors.text }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={styles.content}>{children}</View>
+          </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const arePropsEqual = (p: BottomSheetProps, n: BottomSheetProps) => {
+  return (
+    p.visible === n.visible &&
+    p.title === n.title &&
+    p.height === n.height &&
+    p.children === n.children
+  );
+};
+
+export const BottomSheet = React.memo(BottomSheetBase, arePropsEqual);
 
 const styles = StyleSheet.create({
-  overlay: {
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  kav: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.dark.overlay,
-  },
   sheet: {
-    borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.huge,
-    maxHeight: SCREEN_HEIGHT * 0.85,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    overflow: 'hidden',
   },
   handle: {
-    width: 40,
+    width: 36,
     height: 4,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: SPACING.sm,
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
   title: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    fontSize: FONT_SIZES.sm,
-    textAlign: 'center',
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
   },
   content: {
-    maxHeight: SCREEN_HEIGHT * 0.5,
-  },
-  closeBtn: {
-    marginTop: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-  },
-  closeBtnText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '600',
+    flex: 1,
   },
 });

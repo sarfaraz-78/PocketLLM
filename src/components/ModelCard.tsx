@@ -20,7 +20,7 @@ interface ModelCardProps {
   darkMode: boolean;
 }
 
-export const ModelCard: React.FC<ModelCardProps> = ({
+const ModelCardBase: React.FC<ModelCardProps> = ({
   model,
   isActive,
   isLoading,
@@ -297,6 +297,27 @@ export const ModelCard: React.FC<ModelCardProps> = ({
     </View>
   );
 };
+
+const areModelCardsEqual = (
+  prev: ModelCardProps,
+  next: ModelCardProps
+): boolean => {
+  return (
+    prev.model === next.model &&
+    prev.isActive === next.isActive &&
+    prev.isLoading === next.isLoading &&
+    prev.darkMode === next.darkMode &&
+    prev.onLoad === next.onLoad &&
+    prev.onUnload === next.onUnload &&
+    prev.onDownload === next.onDownload &&
+    prev.onDelete === next.onDelete &&
+    prev.onRetry === next.onRetry &&
+    prev.onCancel === next.onCancel &&
+    prev.onAttachMmproj === next.onAttachMmproj
+  );
+};
+
+export const ModelCard = React.memo(ModelCardBase, areModelCardsEqual);
 
 const styles = StyleSheet.create({
   container: {

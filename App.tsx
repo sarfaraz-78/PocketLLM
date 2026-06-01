@@ -5,6 +5,8 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useSettingsStore } from './src/store/useSettingsStore';
 import { DeviceTierDetector } from './src/inference/DeviceTierDetector';
+import { ToastProvider } from './src/components/ui/ToastProvider';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 const Stack = createStackNavigator();
 
@@ -33,15 +35,19 @@ const App: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!onboardingComplete ? (
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        ) : (
-          <Stack.Screen name="Main" component={AppNavigator} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <ErrorBoundary>
+      <ToastProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {!onboardingComplete ? (
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            ) : (
+              <Stack.Screen name="Main" component={AppNavigator} />
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 };
 

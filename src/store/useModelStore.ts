@@ -12,6 +12,10 @@ interface ModelState {
   setModelStatus: (modelId: string, status: ModelInfo['downloadStatus']) => void;
   setLoadingModelId: (modelId: string | null) => void;
   updateModelMmproj: (modelId: string, mmprojPath: string | undefined) => void;
+  // v3.0: notes, ratings, usage
+  setModelNote: (modelId: string, note: string) => void;
+  setModelRating: (modelId: string, rating: number) => void;
+  recordModelUsage: (modelId: string) => void;
 }
 
 export const useModelStore = create<ModelState>((set) => ({
@@ -59,5 +63,28 @@ export const useModelStore = create<ModelState>((set) => ({
         state.activeModel?.id === modelId
           ? { ...state.activeModel, mmprojPath, isMultimodal: !!mmprojPath }
           : state.activeModel,
+    })),
+
+  setModelNote: (modelId, note) =>
+    set((state) => ({
+      downloadedModels: state.downloadedModels.map((m) =>
+        m.id === modelId ? { ...m, userNote: note } : m
+      ),
+    })),
+
+  setModelRating: (modelId, rating) =>
+    set((state) => ({
+      downloadedModels: state.downloadedModels.map((m) =>
+        m.id === modelId ? { ...m, userRating: rating } : m
+      ),
+    })),
+
+  recordModelUsage: (modelId) =>
+    set((state) => ({
+      downloadedModels: state.downloadedModels.map((m) =>
+        m.id === modelId
+          ? { ...m, lastUsedAt: Date.now(), useCount: (m.useCount || 0) + 1 }
+          : m
+      ),
     })),
 }));

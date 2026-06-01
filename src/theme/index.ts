@@ -1,3 +1,17 @@
+// Re-export design tokens for backward compatibility
+export {
+  SPACING as TOKEN_SPACING,
+  RADIUS as TOKEN_RADIUS,
+  FONT_SIZES as TOKEN_FONT_SIZES,
+  FONT_WEIGHTS as TOKEN_FONT_WEIGHTS,
+  ELEVATION as TOKEN_ELEVATION,
+  ANIMATION as TOKEN_ANIMATION,
+  getThemeColors,
+  THEME_NAMES,
+  THEME_LABELS,
+} from './tokens';
+export type { ThemeName, ThemeColors } from './tokens';
+
 export const COLORS = {
   light: {
     primary: '#6366F1', // Electric Indigo

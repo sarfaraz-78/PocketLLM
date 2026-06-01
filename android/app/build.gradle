@@ -60,4 +60,6 @@ dependencies {
     implementation project(':react-native-vector-icons')
     implementation project(':react-native-device-info')
     implementation project(':react-native-async-storage_async-storage')
+    implementation project(':react-native-clipboard_clipboard')
+    implementation project(':react-native-webview')
 }

@@ -110,14 +110,18 @@ const BottomSheetBase: React.FC<BottomSheetProps> = ({
             style={[
               styles.sheet,
               {
-                backgroundColor: colors.surfaceElevated,
+                backgroundColor: colors.glassBgStrong,
+                borderColor: colors.glassBorder,
+                borderTopWidth: 1,
                 height: numericHeight,
                 transform: [{ translateY }],
+                shadowColor: colors.glow,
+                shadowOpacity: 0.4,
               },
               ELEVATION[4],
             ]}
           >
-            {showHandle && <View style={[styles.handle, { backgroundColor: colors.divider }]} />}
+            {showHandle && <View style={[styles.handle, { backgroundColor: colors.glassBorder }]} />}
 
             {(title || showClose) && (
               <View style={styles.header}>

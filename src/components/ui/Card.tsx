@@ -1,73 +1,28 @@
+// Card is now an alias for GlassCard. Use GlassCard directly in new code.
 import React from 'react';
-import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme';
+import { ViewStyle, StyleProp } from 'react-native';
+import { GlassCard, GlassCardVariant } from './GlassCard';
 
 interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
-  variant?: 'default' | 'elevated' | 'outlined';
+  variant?: GlassCardVariant;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   darkMode?: boolean;
 }
+
+const paddingMap = { none: 0, sm: 8, md: 12, lg: 20 };
 
 export const Card: React.FC<CardProps> = ({
   children,
   style,
   variant = 'default',
   padding = 'lg',
-  darkMode = true,
+  darkMode: _darkMode,
 }) => {
-  const colors = darkMode ? COLORS.dark : COLORS.light;
-
-  const getShadow = () => {
-    switch (variant) {
-      case 'elevated': return SHADOWS.md;
-      case 'outlined': return {};
-      default: return SHADOWS.sm;
-    }
-  };
-
-  const getBgColor = () => {
-    switch (variant) {
-      case 'outlined': return 'transparent';
-      default: return colors.surface;
-    }
-  };
-
-  const getBorder = () => {
-    if (variant === 'outlined') {
-      return { borderWidth: 1, borderColor: colors.border };
-    }
-    return {};
-  };
-
-  const paddingValue = {
-    none: 0,
-    sm: SPACING.sm,
-    md: SPACING.md,
-    lg: SPACING.lg,
-  };
-
   return (
-    <View
-      style={[
-        styles.card,
-        {
-          backgroundColor: getBgColor(),
-          padding: paddingValue[padding],
-        },
-        getShadow(),
-        getBorder(),
-        style,
-      ]}
-    >
+    <GlassCard variant={variant} style={style} padding={paddingMap[padding]}>
       {children}
-    </View>
+    </GlassCard>
   );
 };
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: BORDER_RADIUS.xl,
-  },
-});

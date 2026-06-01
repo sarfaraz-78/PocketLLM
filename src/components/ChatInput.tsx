@@ -169,6 +169,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    paddingBottom: 96,
     borderTopWidth: 1,
   },
   inputContainer: {

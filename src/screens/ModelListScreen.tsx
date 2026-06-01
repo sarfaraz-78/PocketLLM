@@ -23,7 +23,8 @@ import { useModelStore } from '../store/useModelStore';
 import { formatSize, estimateRAM } from '../utils/sizeUtils';
 import { ModelCard } from '../components/ModelCard';
 import { TierBadge } from '../components/TierBadge';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { getModelsForTier } from '../utils/modelRecommendations';
 import { ModelFileManager } from '../services/ModelFileManager';
 import { llamaEngine, extractModelSpecs } from '../inference/LlamaEngine';
@@ -88,7 +89,7 @@ export const ModelListScreen: React.FC = () => {
     setLoadingModelId,
     updateModelMmproj,
   } = useModelStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors, isDark } = useTheme();
 
   const mergedSearchResults = searchResults.map((model) => {
     const dl = downloadedModels.find((m) => m.id === model.id);
@@ -607,7 +608,7 @@ export const ModelListScreen: React.FC = () => {
       >
         {/* Active Model Indicator Panel */}
         {activeModel && (
-          <View style={[styles.activeModelCard, { backgroundColor: colors.surface, borderColor: colors.success + '40' }, SHADOWS.sm]}>
+          <View style={[styles.activeModelCard, { backgroundColor: colors.surface, borderColor: colors.success + '40' }]}>
             <View style={styles.activeModelRow}>
               <View style={[styles.activeIconContainer, { backgroundColor: colors.success + '12' }]}>
                 <Icon name="cube" size={24} color={colors.success} />
@@ -632,7 +633,7 @@ export const ModelListScreen: React.FC = () => {
         )}
 
         {/* Quick Native OS Import Card */}
-        <View style={[styles.importNativeCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+        <View style={[styles.importNativeCard, { backgroundColor: colors.surface }]}>
           <View style={styles.importNativeInfo}>
             <Icon name="cloud-upload-outline" size={24} color={colors.primary} />
             <View style={{ flex: 1, marginLeft: SPACING.md }}>
@@ -653,7 +654,7 @@ export const ModelListScreen: React.FC = () => {
         </View>
 
         {/* Search HuggingFace */}
-        <View style={[styles.searchCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+        <View style={[styles.searchCard, { backgroundColor: colors.surface }]}>
           <Text style={[styles.searchLabel, { color: colors.textSecondary }]}>
             <Icon name="globe-outline" size={14} /> Search HuggingFace Repo
           </Text>
@@ -683,7 +684,7 @@ export const ModelListScreen: React.FC = () => {
 
         {/* Filter Chips */}
         {hasSearched && (
-          <View style={[styles.filterChipsCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+          <View style={[styles.filterChipsCard, { backgroundColor: colors.surface }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChipsScroll}>
               {[
                 { key: 'all' as const, label: 'All', icon: 'apps-outline' },
@@ -794,7 +795,7 @@ export const ModelListScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Loaded Library</Text>
           {downloadedModels.length === 0 ? (
-            <View style={[styles.infoCard, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+            <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
               <Icon name="information-circle-outline" size={20} color={colors.textTertiary} />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 No models loaded yet. Search online or import a local GGUF file to begin.
@@ -940,7 +941,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
   },
   activeDot: {
     width: 6,
@@ -954,7 +955,7 @@ const styles = StyleSheet.create({
   segmentedControl: {
     flexDirection: 'row',
     padding: 3,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -965,7 +966,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     flex: 1,
     paddingVertical: SPACING.sm - 2,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   activeSegmentBtn: {
     // dynamically applied
@@ -979,12 +980,12 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.md,
-    paddingBottom: SPACING.huge,
+    paddingBottom: 110,
     gap: SPACING.md,
   },
   activeModelCard: {
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     borderWidth: 1,
   },
   activeModelRow: {
@@ -995,7 +996,7 @@ const styles = StyleSheet.create({
   activeIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1021,7 +1022,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm - 2,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   unloadBtnText: {
     color: '#FFFFFF',
@@ -1029,7 +1030,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   searchCard: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
   },
   searchLabel: {
@@ -1046,7 +1047,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
     fontSize: FONT_SIZES.sm,
@@ -1054,7 +1055,7 @@ const styles = StyleSheet.create({
   searchBtn: {
     width: 36,
     height: 36,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1076,7 +1077,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     alignItems: 'center',
   },
   infoText: {
@@ -1089,7 +1090,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
   },
   importBarLeft: {
     flexDirection: 'row',
@@ -1115,12 +1116,12 @@ const styles = StyleSheet.create({
   actionIconBtn: {
     width: 34,
     height: 34,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   scanCard: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
   },
   scanHeader: {
@@ -1140,7 +1141,7 @@ const styles = StyleSheet.create({
   scanBtn: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   scanBtnText: {
     color: '#FFFFFF',
@@ -1169,13 +1170,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     gap: SPACING.sm,
   },
   importBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   importText: {
     color: '#FFFFFF',
@@ -1191,14 +1192,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     gap: SPACING.sm,
     marginBottom: SPACING.xs,
   },
   iconBox: {
     width: 36,
     height: 36,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1216,7 +1217,7 @@ const styles = StyleSheet.create({
   loadBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   loadText: {
     fontSize: FONT_SIZES.xs,
@@ -1236,8 +1237,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.huge,
     maxHeight: Dimensions.get('window').height * 0.7,
@@ -1245,7 +1246,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     backgroundColor: '#CCCCCC',
     alignSelf: 'center',
     marginTop: SPACING.md,
@@ -1281,7 +1282,7 @@ const styles = StyleSheet.create({
   quantBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   quantBadgeText: {
     fontSize: FONT_SIZES.xs,
@@ -1290,7 +1291,7 @@ const styles = StyleSheet.create({
   sizeBadge: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   sizeBadgeText: {
     fontSize: FONT_SIZES.xs,
@@ -1311,7 +1312,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     alignSelf: 'center',
     marginBottom: SPACING.md,
   },
@@ -1332,7 +1333,7 @@ const styles = StyleSheet.create({
   cancelBtn: {
     marginTop: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: RADIUS.xxl,
     alignItems: 'center',
   },
   cancelBtnText: {
@@ -1355,7 +1356,7 @@ const styles = StyleSheet.create({
   },
   importNativeCard: {
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     marginBottom: SPACING.lg,
     borderWidth: 1,
     borderColor: 'rgba(99, 102, 241, 0.25)', // glowing purple neon accent
@@ -1380,7 +1381,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 12,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
   },
   importNativeBtnText: {
     color: '#FFFFFF',
@@ -1388,7 +1389,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   filterChipsCard: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.sm,
   },
@@ -1396,6 +1397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: SPACING.xs,
+    paddingBottom: 110,
   },
   filterChip: {
     flexDirection: 'row',
@@ -1403,7 +1405,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: SPACING.md,
     paddingVertical: 7,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     borderWidth: 1,
   },
   filterChipText: {
@@ -1411,3 +1413,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

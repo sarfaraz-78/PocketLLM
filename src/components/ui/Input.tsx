@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -6,9 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../../theme/tokens';
 
 interface InputProps {
   value: string;
@@ -29,7 +31,7 @@ interface InputProps {
   maxLength?: number;
   editable?: boolean;
   style?: ViewStyle;
-  darkMode?: boolean;
+  variant?: 'glass' | 'default';
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -51,34 +53,59 @@ export const Input: React.FC<InputProps> = ({
   maxLength,
   editable = true,
   style,
-  darkMode = true,
+  variant = 'glass',
 }) => {
+  const { colors } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const focusAnim = useRef(new Animated.Value(0)).current;
 
-  const getBorderColor = () => {
-    if (error) return colors.error;
-    if (isFocused) return colors.primary;
-    return colors.border;
-  };
+  useEffect(() => {
+    Animated.timing(focusAnim, {
+      toValue: isFocused ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [isFocused, focusAnim]);
+
+  const borderColor = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [error ? colors.error : colors.glassBorder, error ? colors.error : colors.primary],
+  });
+
+  const glowOpacity = focusAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.4],
+  });
 
   return (
     <View style={[styles.container, style]}>
       {label && (
-        <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          {label}
+        </Text>
       )}
-      <View
+      <Animated.View
         style={[
           styles.inputContainer,
           {
-            backgroundColor: colors.inputBackground,
-            borderColor: getBorderColor(),
+            backgroundColor: variant === 'glass' ? colors.glassBg : colors.inputBackground,
+            borderColor,
+            shadowColor: colors.glow,
+            shadowOpacity: glowOpacity,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: isFocused ? 4 : 0,
           },
-          multiline && { minHeight: 100 },
+          multiline && { minHeight: 100, alignItems: 'flex-start' },
         ]}
       >
         {leftIcon && (
-          <Icon name={leftIcon} size={18} color={colors.textTertiary} style={styles.leftIcon} />
+          <Icon
+            name={leftIcon}
+            size={18}
+            color={isFocused ? colors.primary : colors.textTertiary}
+            style={styles.leftIcon}
+          />
         )}
         <TextInput
           style={[
@@ -102,17 +129,16 @@ export const Input: React.FC<InputProps> = ({
           onBlur={() => setIsFocused(false)}
         />
         {rightIcon && (
-          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon}>
+          <TouchableOpacity onPress={onRightIconPress} style={styles.rightIcon} hitSlop={8}>
             <Icon name={rightIcon} size={18} color={colors.textTertiary} />
           </TouchableOpacity>
         )}
-      </View>
-      {error && (
-        <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-      )}
-      {helper && !error && (
-        <Text style={[styles.helperText, { color: colors.textSecondary }]}>{helper}</Text>
-      )}
+      </Animated.View>
+      {error ? (
+        <Text style={[styles.helperText, { color: colors.error }]}>{error}</Text>
+      ) : helper ? (
+        <Text style={[styles.helperText, { color: colors.textTertiary }]}>{helper}</Text>
+      ) : null}
     </View>
   );
 };
@@ -122,15 +148,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   label: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
     marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.md,
   },
   leftIcon: {
@@ -138,16 +166,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: FONT_SIZES.md,
+    fontSize: FONT_SIZES.base,
     paddingVertical: SPACING.md,
   },
   rightIcon: {
     marginLeft: SPACING.sm,
     padding: SPACING.xs,
-  },
-  errorText: {
-    fontSize: FONT_SIZES.xs,
-    marginTop: SPACING.xs,
   },
   helperText: {
     fontSize: FONT_SIZES.xs,

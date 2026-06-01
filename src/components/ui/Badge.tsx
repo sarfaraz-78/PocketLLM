@@ -1,15 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../theme';
+import { useTheme } from '../../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../../theme/tokens';
 
 interface BadgeProps {
   label: string;
-  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info';
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info' | 'glass';
   size?: 'sm' | 'md' | 'lg';
   icon?: string;
   onPress?: () => void;
-  darkMode?: boolean;
 }
 
 export const Badge: React.FC<BadgeProps> = ({
@@ -18,52 +18,63 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   icon,
   onPress,
-  darkMode = true,
 }) => {
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
 
   const getBgColor = () => {
     switch (variant) {
-      case 'primary': return colors.primary + '15';
-      case 'secondary': return colors.surfaceVariant;
-      case 'success': return colors.success + '15';
-      case 'warning': return colors.warning + '15';
-      case 'error': return colors.error + '15';
-      case 'info': return colors.info + '15';
-      default: return colors.primary + '15';
+      case 'primary': return colors.highlight;
+      case 'secondary': return colors.glassBg;
+      case 'success': return colors.success + '20';
+      case 'warning': return colors.warning + '20';
+      case 'error': return colors.error + '20';
+      case 'info': return colors.info + '20';
+      case 'glass': return colors.glassBg;
+      default: return colors.highlight;
     }
   };
 
   const getTextColor = () => {
     switch (variant) {
-      case 'primary': return colors.primary;
+      case 'primary': return colors.primaryLight;
       case 'secondary': return colors.textSecondary;
       case 'success': return colors.success;
       case 'warning': return colors.warning;
       case 'error': return colors.error;
       case 'info': return colors.info;
-      default: return colors.primary;
+      case 'glass': return colors.text;
+      default: return colors.primaryLight;
     }
   };
 
   const getPadding = () => {
     switch (size) {
-      case 'sm': return { paddingVertical: 2, paddingHorizontal: SPACING.sm };
-      case 'lg': return { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg };
-      default: return { paddingVertical: SPACING.xs, paddingHorizontal: SPACING.md };
+      case 'sm': return { paddingVertical: 3, paddingHorizontal: SPACING.sm };
+      case 'lg': return { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.md };
+      default: return { paddingVertical: 4, paddingHorizontal: SPACING.sm + 2 };
     }
   };
 
   const getFontSize = () => {
     switch (size) {
       case 'sm': return FONT_SIZES.xs;
-      case 'lg': return FONT_SIZES.md;
+      case 'lg': return FONT_SIZES.base;
       default: return FONT_SIZES.sm;
     }
   };
 
   const content = (
-    <View style={[styles.badge, { backgroundColor: getBgColor() }, getPadding()]}>
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: getBgColor(),
+          borderColor: variant === 'glass' ? colors.glassBorder : 'transparent',
+          borderWidth: variant === 'glass' ? 1 : 0,
+        },
+        getPadding(),
+      ]}
+    >
       {icon && (
         <Icon name={icon} size={getFontSize() + 2} color={getTextColor()} style={styles.icon} />
       )}
@@ -88,13 +99,14 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     alignSelf: 'flex-start',
   },
   icon: {
     marginRight: 4,
   },
   label: {
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

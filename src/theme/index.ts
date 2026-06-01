@@ -9,65 +9,66 @@ export {
   getThemeColors,
   THEME_NAMES,
   THEME_LABELS,
+  THEME_DESCRIPTIONS,
 } from './tokens';
 export type { ThemeName, ThemeColors } from './tokens';
 
 export const COLORS = {
   light: {
-    primary: '#6366F1', // Electric Indigo
+    primary: '#6366F1',
     primaryDark: '#4F46E5',
-    primaryLight: '#C7D2FE',
-    secondary: '#8B5CF6', // Cyber Purple
-    accent: '#EC4899', // Neon Pink
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    surfaceVariant: '#EEF2F6',
+    primaryLight: '#A5B4FC',
+    secondary: '#A855F7',
+    accent: '#EC4899',
+    background: '#F5F3FF',
+    surface: 'rgba(255, 255, 255, 0.7)',
+    surfaceVariant: 'rgba(99, 102, 241, 0.06)',
     surfaceElevated: '#FFFFFF',
-    text: '#0F172A',
+    text: '#1E1B4B',
     textSecondary: '#475569',
     textTertiary: '#94A3B8',
-    border: '#E2E8F0',
-    divider: '#EEF2F6',
-    error: '#EF4444',
-    success: '#10B981',
-    warning: '#F59E0B',
-    info: '#3B82F6',
+    border: 'rgba(99, 102, 241, 0.12)',
+    divider: 'rgba(99, 102, 241, 0.06)',
+    error: '#DC2626',
+    success: '#059669',
+    warning: '#D97706',
+    info: '#2563EB',
     userBubble: '#6366F1',
-    assistantBubble: '#EEF2F6',
+    assistantBubble: 'rgba(99, 102, 241, 0.06)',
     userBubbleText: '#FFFFFF',
-    assistantBubbleText: '#0F172A',
-    inputBackground: '#EEF2F6',
-    overlay: 'rgba(15, 23, 42, 0.4)',
-    gradientStart: '#6366F1',
-    gradientEnd: '#8B5CF6',
+    assistantBubbleText: '#1E1B4B',
+    inputBackground: 'rgba(255, 255, 255, 0.7)',
+    overlay: 'rgba(30, 27, 75, 0.4)',
+    gradientStart: '#A78BFA',
+    gradientEnd: '#6366F1',
   },
   dark: {
-    primary: '#818CF8', // Electric Indigo
-    primaryDark: '#6366F1',
-    primaryLight: '#EEF2FF',
-    secondary: '#A78BFA', // Cyber Purple
-    accent: '#F472B6', // Glowing Neon Pink
-    background: '#030712', // Vantablack void dark background
-    surface: '#0B0F19', // Obsidian glassmorphic slate
-    surfaceVariant: '#1F2937', // Cosmic slate
-    surfaceElevated: '#111827',
-    text: '#F9FAFB', // Ice White
-    textSecondary: '#E5E7EB', // Silver
-    textTertiary: '#9CA3AF', // Obsidian Grey
-    border: '#1F2937',
-    divider: '#111827',
+    primary: '#7C3AED',
+    primaryDark: '#5B21B6',
+    primaryLight: '#A78BFA',
+    secondary: '#6366F1',
+    accent: '#22D3EE',
+    background: '#0A0B1E',
+    surface: 'rgba(255, 255, 255, 0.05)',
+    surfaceVariant: 'rgba(255, 255, 255, 0.07)',
+    surfaceElevated: 'rgba(255, 255, 255, 0.09)',
+    text: '#F8FAFC',
+    textSecondary: '#B4B6CC',
+    textTertiary: '#7A7E96',
+    border: 'rgba(255, 255, 255, 0.08)',
+    divider: 'rgba(255, 255, 255, 0.05)',
     error: '#F87171',
     success: '#34D399',
     warning: '#FBBF24',
     info: '#60A5FA',
-    userBubble: '#6366F1',
-    assistantBubble: '#1F2937',
+    userBubble: '#7C3AED',
+    assistantBubble: 'rgba(255, 255, 255, 0.05)',
     userBubbleText: '#FFFFFF',
-    assistantBubbleText: '#F9FAFB',
-    inputBackground: '#1F2937',
-    overlay: 'rgba(0, 0, 0, 0.75)',
-    gradientStart: '#6366F1',
-    gradientEnd: '#A78BFA',
+    assistantBubbleText: '#F8FAFC',
+    inputBackground: 'rgba(255, 255, 255, 0.06)',
+    overlay: 'rgba(0, 0, 0, 0.7)',
+    gradientStart: '#A78BFA',
+    gradientEnd: '#6366F1',
   },
 };
 
@@ -83,23 +84,24 @@ export const SPACING = {
 };
 
 export const FONT_SIZES = {
-  xs: 10,
-  sm: 12,
-  md: 14,
-  lg: 16,
-  xl: 18,
-  xxl: 20,
-  xxxl: 24,
-  display: 32,
-  hero: 40,
+  xs: 11,
+  sm: 13,
+  md: 15,
+  lg: 17,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+  display: 40,
+  hero: 48,
 };
 
 export const BORDER_RADIUS = {
-  sm: 6,
+  sm: 8,
   md: 12,
   lg: 16,
   xl: 20,
-  xxl: 28,
+  xxl: 24,
+  xxxl: 32,
   full: 9999,
 };
 
@@ -107,29 +109,36 @@ export const SHADOWS = {
   xs: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1.5,
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sm: {
-    shadowColor: '#6366F1', // Indigo glow
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
     elevation: 3,
   },
   md: {
-    shadowColor: '#8B5CF6', // Purple glow
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
     elevation: 6,
   },
   lg: {
-    shadowColor: '#6366F1',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.22,
     shadowRadius: 24,
     elevation: 12,
+  },
+  glow: {
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.40,
+    shadowRadius: 16,
+    elevation: 8,
   },
 };

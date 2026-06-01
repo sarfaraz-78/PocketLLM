@@ -10,7 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, FONT_SIZES } from '../theme';
+import { SPACING, RADIUS, FONT_SIZES } from '../theme/tokens';
+import { useTheme } from '../hooks/useTheme';
 import { IdeScreen } from './IdeScreen';
 import { TerminalScreen } from './TerminalScreen';
 import { BrowserScreen } from './BrowserScreen';
@@ -19,7 +20,7 @@ type WorkspaceTab = 'ide' | 'terminal' | 'browser';
 
 export const WorkspaceScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('ide');
 
   const renderContent = () => {
@@ -49,7 +50,7 @@ export const WorkspaceScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.tabBtn,
-              activeTab === 'ide' && [styles.activeTabBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
+              activeTab === 'ide' && [styles.activeTabBtn, { backgroundColor: colors.surface }],
             ]}
             onPress={() => setActiveTab('ide')}
             activeOpacity={0.8}
@@ -73,7 +74,7 @@ export const WorkspaceScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.tabBtn,
-              activeTab === 'terminal' && [styles.activeTabBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
+              activeTab === 'terminal' && [styles.activeTabBtn, { backgroundColor: colors.surface }],
             ]}
             onPress={() => setActiveTab('terminal')}
             activeOpacity={0.8}
@@ -97,7 +98,7 @@ export const WorkspaceScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.tabBtn,
-              activeTab === 'browser' && [styles.activeTabBtn, { backgroundColor: colors.surface }, SHADOWS.xs],
+              activeTab === 'browser' && [styles.activeTabBtn, { backgroundColor: colors.surface }],
             ]}
             onPress={() => setActiveTab('browser')}
             activeOpacity={0.8}
@@ -153,7 +154,7 @@ const styles = StyleSheet.create({
   switcherContainer: {
     flexDirection: 'row',
     padding: 3,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     flex: 1,
     paddingVertical: SPACING.sm - 2,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   activeTabBtn: {
     // Styling handled dynamically via inline styles

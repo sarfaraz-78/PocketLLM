@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ModelInfo } from '../types';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { TierBadge } from './TierBadge';
 import { formatSize } from '../utils/sizeUtils';
 
@@ -31,11 +32,12 @@ const ModelCardBase: React.FC<ModelCardProps> = ({
   onRetry,
   onCancel,
   onAttachMmproj,
-  darkMode,
+  darkMode: _darkMode,
 }) => {
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
   const screenWidth = Dimensions.get('window').width;
-  const cardWidth = screenWidth > 600 ? 280 : screenWidth - SPACING.lg * 2;
+  const isLargeTablet = screenWidth >= 1024;
+  const cardWidth = isLargeTablet ? Math.min(480, screenWidth - SPACING.lg * 2) : undefined;
 
   const getStatusIcon = () => {
     switch (model.downloadStatus) {
@@ -67,8 +69,18 @@ const ModelCardBase: React.FC<ModelCardProps> = ({
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.surface, width: cardWidth },
-        SHADOWS.sm,
+        {
+          backgroundColor: isActive ? colors.glassBgStrong : colors.glassBg,
+          borderColor: isActive ? colors.glassHighlight : colors.glassBorder,
+          borderWidth: 1,
+          alignSelf: isLargeTablet ? 'center' : 'stretch',
+          width: cardWidth,
+          shadowColor: isActive ? colors.glow : '#000',
+          shadowOffset: { width: 0, height: isActive ? 0 : 4 },
+          shadowOpacity: isActive ? 0.45 : 0.12,
+          shadowRadius: isActive ? 18 : 8,
+          elevation: isActive ? 6 : 2,
+        },
       ]}
     >
       <View>
@@ -138,7 +150,7 @@ const ModelCardBase: React.FC<ModelCardProps> = ({
 
         {/* Model Specs from GGUF metadata */}
         {model.specs && (
-          <View style={[styles.specsBox, { backgroundColor: colors.background + '60', borderColor: colors.border + '40' }]}>
+          <View style={[styles.specsBox, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
             <View style={styles.specsGrid}>
               {model.specs.layerCount !== undefined && (
                 <View style={styles.specItem}>
@@ -321,7 +333,7 @@ export const ModelCard = React.memo(ModelCardBase, areModelCardsEqual);
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     padding: SPACING.lg,
     margin: SPACING.sm,
     flexDirection: 'column',
@@ -353,7 +365,7 @@ const styles = StyleSheet.create({
   paramsBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: RADIUS.sm,
   },
   paramsBadgeText: {
     fontSize: FONT_SIZES.xs,
@@ -365,7 +377,7 @@ const styles = StyleSheet.create({
     gap: 3,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: RADIUS.sm,
   },
   activeBadgeText: {
     fontSize: FONT_SIZES.xs,
@@ -388,13 +400,13 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 6,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     overflow: 'hidden',
     marginBottom: SPACING.xs,
   },
   progressBar: {
     height: '100%',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
   },
   progressText: {
     fontSize: FONT_SIZES.xs,
@@ -411,7 +423,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   actionText: {
     fontSize: FONT_SIZES.sm,
@@ -424,7 +436,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   downloadText: {
     color: '#FFFFFF',
@@ -438,7 +450,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   downloadingText: {
     fontSize: FONT_SIZES.sm,
@@ -451,7 +463,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   loadingBtnText: {
     fontSize: FONT_SIZES.sm,
@@ -459,7 +471,7 @@ const styles = StyleSheet.create({
   },
   specsBox: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.md,
   },
@@ -493,12 +505,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.xs,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   smallActionBtn: {
     width: 36,
     height: 36,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -13,7 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { TierBadge } from '../components/TierBadge';
 import { DeviceTierDetector } from '../inference/DeviceTierDetector';
 import { Button } from '../components/ui/Button';
@@ -39,7 +40,7 @@ export const SettingsScreen: React.FC = () => {
     setTurboQuantEnabled,
     resetToDefaults,
   } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors, isDark } = useTheme();
 
   const [deviceProfile, setDeviceProfile] = useState<{
     cpuModel: string;
@@ -264,7 +265,7 @@ const SettingRow: React.FC<SettingRowProps> = ({ icon, label, children, darkMode
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
-  content: { padding: SPACING.lg, paddingBottom: SPACING.huge },
+  content: { padding: SPACING.lg, paddingBottom: 110 },
   pageTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', marginBottom: SPACING.lg },
   card: { marginBottom: SPACING.lg },
   cardTitle: { fontSize: FONT_SIZES.xs, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SPACING.md },
@@ -275,16 +276,16 @@ const styles = StyleSheet.create({
   hardwareText: { fontSize: FONT_SIZES.sm, fontWeight: '400', marginLeft: SPACING.sm },
   settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   settingLeft: { flexDirection: 'row', alignItems: 'center', marginLeft: SPACING.md },
-  settingIcon: { width: 36, height: 36, borderRadius: BORDER_RADIUS.md, justifyContent: 'center', alignItems: 'center' },
+  settingIcon: { width: 36, height: 36, borderRadius: RADIUS.md, justifyContent: 'center', alignItems: 'center' },
   settingLabel: { fontSize: FONT_SIZES.md, fontWeight: '500', marginLeft: SPACING.md },
-  textInput: { borderWidth: 1, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, fontSize: FONT_SIZES.md, minHeight: 120, lineHeight: 22 },
+  textInput: { borderWidth: 1, borderRadius: RADIUS.lg, padding: SPACING.lg, fontSize: FONT_SIZES.md, minHeight: 120, lineHeight: 22 },
   madeIn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.xs, paddingVertical: SPACING.xxl },
   madeInText: { fontSize: FONT_SIZES.sm, fontWeight: '500' },
   turboInfo: {
     flexDirection: 'row',
     gap: SPACING.sm,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     marginTop: SPACING.md,
     alignItems: 'flex-start',
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     borderWidth: 1.5,
     borderStyle: 'dashed',
   },

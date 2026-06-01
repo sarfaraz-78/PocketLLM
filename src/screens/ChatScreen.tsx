@@ -27,7 +27,9 @@ import { VoicePicker } from '../components/VoicePicker';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatInput, AttachmentItem } from '../components/ChatInput';
 import { ModelStatusBar } from '../components/ModelStatusBar';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
+import { Logo } from '../components/Logo';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { ChatMessage } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -71,7 +73,7 @@ export const ChatScreen: React.FC = () => {
     setTTSVoiceId,
   } = useSettingsStore();
   const { saveCurrentConversation } = useHistoryStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors, isDark } = useTheme();
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voicePickerVisible, setVoicePickerVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -149,9 +151,9 @@ export const ChatScreen: React.FC = () => {
     setGenerating(true);
 
     try {
-      const codingModeTools = codingMode 
-        ? '\n\n[OPENCODE AGENT SYSTEM]: You are an expert autonomous coding agent operating inside the user\'s ACTIVE workspace. ' +
-          'You work like OpenCode — you understand the existing codebase before making changes.\n\n' +
+      const codingModeTools = codingMode
+        ? '\n\n[CODE AGENT SYSTEM]: You are an expert autonomous coding agent operating inside the user\'s ACTIVE workspace. ' +
+          'You understand the existing codebase before making changes.\n\n' +
           'WORKFLOW (follow this order):\n' +
           '1. UNDERSTAND: Start by calling `ide_list` to see all files, then `ide_read` on relevant files\n' +
           '2. PLAN: Briefly explain what you\'ll change and why\n' +
@@ -378,15 +380,34 @@ export const ChatScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <View style={[styles.emptyIconWrapper, { backgroundColor: colors.primary + '10' }]}>
-        <Icon name="chatbubbles-outline" size={48} color={colors.primary} />
+      <View
+        style={[
+          styles.emptyIconWrapper,
+          {
+            backgroundColor: colors.glassBg,
+            borderColor: colors.glassBorder,
+            borderWidth: 1,
+            shadowColor: colors.glow,
+          },
+        ]}
+      >
+        <Icon name="chatbubbles-outline" size={44} color={colors.primaryLight} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>Start a conversation</Text>
       <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
         Load a model and type your first message below
       </Text>
       {!activeModel && (
-        <View style={[styles.emptyHint, { backgroundColor: colors.warning + '10' }]}>
+        <View
+          style={[
+            styles.emptyHint,
+            {
+              backgroundColor: colors.warning + '15',
+              borderColor: colors.warning + '30',
+              borderWidth: 1,
+            },
+          ]}
+        >
           <Icon name="warning-outline" size={16} color={colors.warning} />
           <Text style={[styles.emptyHintText, { color: colors.warning }]}>
             No model loaded. Go to Models tab to load one.
@@ -405,11 +426,17 @@ export const ChatScreen: React.FC = () => {
       >
         <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
 
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.glassBgStrong,
+              borderBottomColor: colors.glassBorder,
+            },
+          ]}
+        >
           <View style={styles.headerLeft}>
-            <View style={[styles.logoIcon, { backgroundColor: colors.primary }]}>
-              <Text style={styles.logoText}>P</Text>
-            </View>
+            <Logo size={36} breathing={false} />
             <View>
               <Text style={[styles.headerTitle, { color: colors.text }]}>Chat</Text>
               {activeModel && (
@@ -421,8 +448,11 @@ export const ChatScreen: React.FC = () => {
           </View>
           <View style={styles.headerRight}>
             {messages.length > 0 && (
-              <TouchableOpacity onPress={handleClear} style={styles.headerBtn}>
-                <Icon name="trash-outline" size={20} color={colors.textTertiary} />
+              <TouchableOpacity
+                onPress={handleClear}
+                style={[styles.headerBtn, { backgroundColor: colors.glassBg }]}
+              >
+                <Icon name="trash-outline" size={18} color={colors.textTertiary} />
               </TouchableOpacity>
             )}
           </View>
@@ -435,11 +465,11 @@ export const ChatScreen: React.FC = () => {
         />
 
         {codingMode && (
-          <View style={[styles.hudContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <View style={[styles.hudContainer, { backgroundColor: colors.glassBg, borderBottomColor: colors.glassBorder, borderTopColor: colors.glassBorder, borderTopWidth: 1 }]}>
             <View style={styles.hudHeader}>
               <View style={styles.hudTitleRow}>
                 <Icon name="terminal-outline" size={13} color={colors.primary} />
-                <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>OPENCODE AGENT</Text>
+                <Text style={[styles.hudTitle, { color: colors.textSecondary }]}>CODE AGENT</Text>
                 {agentIterations > 0 && (
                   <View style={[styles.hudAgentBadge, { backgroundColor: colors.warning + '18' }]}>
                     <Text style={[styles.hudAgentText, { color: colors.warning }]}>thinking step {agentIterations}/5</Text>
@@ -462,7 +492,7 @@ export const ChatScreen: React.FC = () => {
               {files.filter(f => f.type === 'file').map((file) => (
                 <TouchableOpacity
                   key={file.id}
-                  style={[styles.hudFileBadge, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  style={[styles.hudFileBadge, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}
                   onPress={() => {
                     Alert.alert(
                       `File: ${file.name}`,
@@ -494,11 +524,20 @@ export const ChatScreen: React.FC = () => {
           />
         )}
 
-        <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View
+          style={[
+            styles.actionBar,
+            { backgroundColor: colors.glassBgStrong, borderTopColor: colors.glassBorder },
+          ]}
+        >
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              { backgroundColor: codingMode ? colors.primary + '15' : colors.surfaceVariant },
+              {
+                backgroundColor: codingMode ? colors.highlight : colors.glassBg,
+                borderColor: codingMode ? colors.glassHighlight : 'transparent',
+                borderWidth: 1,
+              },
             ]}
             onPress={() => setCodingMode(!codingMode)}
             activeOpacity={0.8}
@@ -506,17 +545,26 @@ export const ChatScreen: React.FC = () => {
             <Icon
               name={codingMode ? 'code-slash' : 'code-slash-outline'}
               size={15}
-              color={codingMode ? colors.primary : colors.textSecondary}
+              color={codingMode ? colors.primaryLight : colors.textSecondary}
             />
-            <Text style={[styles.actionText, { color: codingMode ? colors.primary : colors.textSecondary }]}>
-              Coding Mode
+            <Text
+              style={[
+                styles.actionText,
+                { color: codingMode ? colors.primaryLight : colors.textSecondary },
+              ]}
+            >
+              Coding
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              { backgroundColor: enableThinking ? colors.primary + '15' : colors.surfaceVariant },
+              {
+                backgroundColor: enableThinking ? colors.highlight : colors.glassBg,
+                borderColor: enableThinking ? colors.glassHighlight : 'transparent',
+                borderWidth: 1,
+              },
             ]}
             onPress={() => setEnableThinking(!enableThinking)}
             activeOpacity={0.8}
@@ -524,9 +572,14 @@ export const ChatScreen: React.FC = () => {
             <Icon
               name={enableThinking ? 'brain' : 'brain-outline'}
               size={16}
-              color={enableThinking ? colors.primary : colors.textSecondary}
+              color={enableThinking ? colors.primaryLight : colors.textSecondary}
             />
-            <Text style={[styles.actionText, { color: enableThinking ? colors.primary : colors.textSecondary }]}>
+            <Text
+              style={[
+                styles.actionText,
+                { color: enableThinking ? colors.primaryLight : colors.textSecondary },
+              ]}
+            >
               Thinking
             </Text>
           </TouchableOpacity>
@@ -535,7 +588,11 @@ export const ChatScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.actionBtn,
-                { backgroundColor: isSpeaking ? colors.primary + '15' : colors.surfaceVariant },
+                {
+                  backgroundColor: isSpeaking ? colors.highlight : colors.glassBg,
+                  borderColor: isSpeaking ? colors.glassHighlight : 'transparent',
+                  borderWidth: 1,
+                },
               ]}
               onPress={handleSpeak}
               activeOpacity={0.8}
@@ -543,9 +600,14 @@ export const ChatScreen: React.FC = () => {
               <Icon
                 name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
                 size={16}
-                color={isSpeaking ? colors.primary : colors.textSecondary}
+                color={isSpeaking ? colors.primaryLight : colors.textSecondary}
               />
-              <Text style={[styles.actionText, { color: isSpeaking ? colors.primary : colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: isSpeaking ? colors.primaryLight : colors.textSecondary },
+                ]}
+              >
                 {isSpeaking ? 'Speaking...' : 'Read'}
               </Text>
             </TouchableOpacity>
@@ -553,7 +615,10 @@ export const ChatScreen: React.FC = () => {
 
           {showTTS && (
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.surfaceVariant }]}
+              style={[
+                styles.actionBtn,
+                { backgroundColor: colors.glassBg, borderColor: colors.glassBorder, borderWidth: 1 },
+              ]}
               onPress={() => setVoicePickerVisible(true)}
               activeOpacity={0.8}
             >
@@ -600,7 +665,7 @@ const styles = StyleSheet.create({
   logoIcon: {
     width: 36,
     height: 36,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -608,8 +673,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700' },
   headerSubtitle: { fontSize: FONT_SIZES.xs, marginTop: 1 },
   headerRight: { flexDirection: 'row', gap: SPACING.xs },
-  headerBtn: { padding: SPACING.sm, borderRadius: BORDER_RADIUS.md },
-  messageList: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.md },
+  headerBtn: { padding: SPACING.sm, borderRadius: RADIUS.md },
+  messageList: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: 100 },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -617,12 +682,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xxl,
   },
   emptyIconWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 28,
+    width: 96,
+    height: 96,
+    borderRadius: RADIUS.xxl,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.lg,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 6,
   },
   emptyTitle: {
     fontSize: FONT_SIZES.xl,
@@ -641,7 +710,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
   },
   emptyHintText: {
     fontSize: FONT_SIZES.sm,
@@ -697,6 +766,7 @@ const styles = StyleSheet.create({
   hudScroll: {
     gap: SPACING.sm,
     paddingVertical: 2,
+    paddingBottom: 110,
   },
   hudFileBadge: {
     flexDirection: 'row',
@@ -739,3 +809,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

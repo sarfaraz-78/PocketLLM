@@ -14,7 +14,8 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useWorkspaceStore } from '../store/useWorkspaceStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 
 interface CSSStyles {
   [key: string]: {
@@ -44,7 +45,7 @@ interface ParsedElement {
 
 export const BrowserScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
 
   const { browserUrl, setBrowserUrl, bookmarks, files } = useWorkspaceStore();
   const [inputUrl, setInputUrl] = useState(browserUrl);
@@ -466,7 +467,7 @@ export const BrowserScreen: React.FC = () => {
 
     if (!htmlFile || !htmlFile.content) {
       return (
-        <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
           <View style={styles.webContentBlock}>
             <Icon name="cloud-offline-outline" size={48} color={colors.error} />
             <Text style={[styles.webTitle, { color: colors.text }]}>LOCAL PORT 3000</Text>
@@ -694,7 +695,7 @@ export const BrowserScreen: React.FC = () => {
     };
 
     return (
-      <View style={[styles.webBody, { backgroundColor: '#0b0f19' }, SHADOWS.sm]}>
+      <View style={[styles.webBody, { backgroundColor: '#0b0f19' }]}>
         {/* Local live-reload banner */}
         <View style={[styles.localBanner, { backgroundColor: colors.success + '15', borderColor: colors.success + '30' }]}>
           <Icon name="flash" size={14} color={colors.success} />
@@ -724,7 +725,7 @@ export const BrowserScreen: React.FC = () => {
     // 1. GitHub Mock Page Layout
     if (domain.includes('github.com')) {
       return (
-        <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
           <View style={styles.gitHubHeader}>
             <View style={styles.gitHubTitleRow}>
               <Icon name="logo-github" size={24} color={colors.text} />
@@ -791,7 +792,7 @@ export const BrowserScreen: React.FC = () => {
     if (domain.includes('google.com')) {
       const isSearch = browserUrl.includes('search');
       return (
-        <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
           <View style={styles.googleSearchHeader}>
             <Text style={[styles.googleColorLogo]}>
               <Text style={{ color: '#4285F4' }}>G</Text>
@@ -842,7 +843,7 @@ export const BrowserScreen: React.FC = () => {
     // 3. Stack Overflow Mock Page Layout
     if (domain.includes('stackoverflow.com')) {
       return (
-        <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
           <View style={styles.stackHeader}>
             <Icon name="logo-stackoverflow" size={24} color="#f48024" />
             <Text style={[styles.stackTitleText, { color: colors.text }]}>stack overflow</Text>
@@ -902,7 +903,7 @@ export const BrowserScreen: React.FC = () => {
     // 4. MDN Web Docs Mock Page Layout
     if (domain.includes('mozilla.org')) {
       return (
-        <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+        <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
           <View style={styles.mdnHeader}>
             <Text style={[styles.mdnLogoText, { color: colors.text }]}>mdn web docs</Text>
           </View>
@@ -928,7 +929,7 @@ export const BrowserScreen: React.FC = () => {
 
     // 5. Generic Sandbox Portal Page View
     return (
-      <View style={[styles.webBody, { backgroundColor: colors.surface }, SHADOWS.sm]}>
+      <View style={[styles.webBody, { backgroundColor: colors.surface }]}>
         <View style={styles.webContentBlock}>
           <Icon name="earth-outline" size={48} color={colors.primary} style={styles.earthLogo} />
           <Text style={[styles.webTitle, { color: colors.text }]}>
@@ -1045,7 +1046,7 @@ export const BrowserScreen: React.FC = () => {
         ) : (
           <ScrollView contentContainerStyle={styles.simulatedPageContent}>
             {/* Browser Window Header */}
-            <View style={[styles.webHeader, { backgroundColor: colors.surface, borderColor: colors.border }, SHADOWS.xs]}>
+            <View style={[styles.webHeader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.dotRow}>
                 <View style={[styles.dot, { backgroundColor: '#FF5F56' }]} />
                 <View style={[styles.dot, { backgroundColor: '#FFBD2E' }]} />
@@ -1084,7 +1085,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.sm,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     gap: SPACING.xs,
   },
@@ -1096,7 +1097,7 @@ const styles = StyleSheet.create({
   goBtn: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1110,6 +1111,7 @@ const styles = StyleSheet.create({
   bookmarksScroll: {
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
+    paddingBottom: 110,
   },
   bookmarkPill: {
     flexDirection: 'row',
@@ -1117,7 +1119,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     borderWidth: 1,
   },
   bookmarkText: {
@@ -1140,14 +1142,14 @@ const styles = StyleSheet.create({
   simulatedPageContent: {
     padding: SPACING.md,
     gap: SPACING.md,
-    paddingBottom: SPACING.huge,
+    paddingBottom: 110,
   },
   webHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     justifyContent: 'space-between',
   },
@@ -1168,7 +1170,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.md,
   },
   webBody: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     padding: SPACING.xl,
   },
   webContentBlock: {
@@ -1206,7 +1208,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md - 2,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     marginTop: SPACING.sm,
   },
   actionBtnText: {
@@ -1229,7 +1231,7 @@ const styles = StyleSheet.create({
   gitPill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
   },
   gitPillText: {
     fontSize: 9,
@@ -1263,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   gitFileList: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
     marginBottom: SPACING.md,
   },
@@ -1286,7 +1288,7 @@ const styles = StyleSheet.create({
   },
   readmeCard: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     overflow: 'hidden',
   },
   readmeHeader: {
@@ -1328,7 +1330,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm - 2,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     borderWidth: 1,
   },
   searchPillVal: {
@@ -1411,7 +1413,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     borderWidth: 1,
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     marginTop: SPACING.xl,
     marginBottom: SPACING.md,
   },
@@ -1421,7 +1423,7 @@ const styles = StyleSheet.create({
   },
   soCodeCard: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     padding: SPACING.md,
   },
   soCodeText: {
@@ -1454,7 +1456,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: RADIUS.sm,
     marginBottom: SPACING.lg,
   },
   mdnAlertText: {
@@ -1473,7 +1475,7 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     padding: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     marginBottom: SPACING.md,
   },
   localBannerText: {
@@ -1501,7 +1503,7 @@ const styles = StyleSheet.create({
   localButton: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     alignSelf: 'flex-start',
     marginTop: 6,
   },
@@ -1512,8 +1514,10 @@ const styles = StyleSheet.create({
   },
   localDiv: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     padding: SPACING.md,
     marginVertical: 4,
   },
 });
+
+

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity, Alert } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { ChatMessage } from '../types';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import Markdown from 'react-native-markdown-display';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -13,10 +14,10 @@ interface MessageBubbleProps {
 
 const MessageBubbleBase: React.FC<MessageBubbleProps> = ({
   message,
-  darkMode,
+  darkMode: _darkMode,
 }) => {
+  const { colors, isDark } = useTheme();
   const isUser = message.role === 'user';
-  const colors = darkMode ? COLORS.dark : COLORS.light;
   const attachments = message.attachments || [];
   const [showThinking, setShowThinking] = useState(true); // Default to showing thinking so it streams beautifully
 
@@ -58,8 +59,15 @@ const MessageBubbleBase: React.FC<MessageBubbleProps> = ({
             backgroundColor: isUser
               ? colors.userBubble
               : colors.assistantBubble,
-            borderBottomLeftRadius: isUser ? BORDER_RADIUS.lg : BORDER_RADIUS.sm,
-            borderBottomRightRadius: isUser ? BORDER_RADIUS.sm : BORDER_RADIUS.lg,
+            borderColor: isUser ? 'transparent' : colors.glassBorder,
+            borderWidth: isUser ? 0 : 1,
+            borderBottomLeftRadius: isUser ? RADIUS.lg : RADIUS.sm,
+            borderBottomRightRadius: isUser ? RADIUS.sm : RADIUS.lg,
+            shadowColor: isUser ? colors.glow : 'transparent',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: isUser ? 0.35 : 0,
+            shadowRadius: 12,
+            elevation: isUser ? 4 : 0,
           },
         ]}
       >
@@ -134,24 +142,27 @@ const MessageBubbleBase: React.FC<MessageBubbleProps> = ({
               style={{
                 body: {
                   color: colors.assistantBubbleText,
-                  fontSize: FONT_SIZES.md,
+                  fontSize: FONT_SIZES.base,
+                  lineHeight: 22,
                 },
                 paragraph: {
-                  marginBottom: 4,
+                  marginBottom: 6,
                 },
                 code_inline: {
-                  backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
-                  color: darkMode ? '#F8FAFC' : '#0F172A',
-                  borderRadius: BORDER_RADIUS.sm,
-                  paddingHorizontal: 4,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.10)',
+                  color: isDark ? colors.text : '#1E1B4B',
+                  borderRadius: RADIUS.xs,
+                  paddingHorizontal: 5,
                   fontFamily: 'monospace',
                 },
                 fence: {
-                  backgroundColor: darkMode ? '#1E293B' : '#E2E8F0',
-                  borderRadius: BORDER_RADIUS.md,
+                  backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(99,102,241,0.06)',
+                  borderRadius: RADIUS.md,
                   padding: SPACING.md,
-                  color: darkMode ? '#F8FAFC' : '#0F172A',
+                  color: isDark ? colors.text : '#1E1B4B',
                   fontFamily: 'monospace',
+                  borderWidth: 1,
+                  borderColor: colors.glassBorder,
                 },
               }}
             >
@@ -219,7 +230,7 @@ const styles = StyleSheet.create({
   bubble: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     width: '80%',
     maxWidth: 320,
   },
@@ -247,7 +258,7 @@ const styles = StyleSheet.create({
   attachmentImage: {
     width: 120,
     height: 120,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   thinkingSection: {
     marginBottom: SPACING.sm,
@@ -258,7 +269,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     alignSelf: 'flex-start',
     marginBottom: SPACING.xs,
   },
@@ -268,7 +279,7 @@ const styles = StyleSheet.create({
   },
   thinkingContent: {
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     marginBottom: SPACING.xs,
   },
   thinkingLabel: {
@@ -293,6 +304,6 @@ const styles = StyleSheet.create({
     top: SPACING.sm,
     right: SPACING.sm,
     padding: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: RADIUS.sm,
   },
 });

@@ -1,26 +1,27 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { GenerationStats, ModelInfo } from '../types';
 
 interface ModelStatusBarProps {
   activeModel: ModelInfo | null;
   lastStats: GenerationStats | null;
-  darkMode: boolean;
+  darkMode?: boolean;
 }
 
 export const ModelStatusBar: React.FC<ModelStatusBarProps> = ({
   activeModel,
   lastStats,
-  darkMode,
+  darkMode: _darkMode,
 }) => {
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
 
   if (!activeModel) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surfaceVariant }]}>
-        <View style={[styles.dot, { backgroundColor: colors.warning }]} />
+      <View style={[styles.container, { backgroundColor: colors.glassBg, borderBottomColor: colors.glassBorder }]}>
+        <View style={[styles.dot, { backgroundColor: colors.warning, shadowColor: colors.warning }]} />
         <Text style={[styles.text, { color: colors.textSecondary }]}>
           No model loaded
         </Text>
@@ -29,9 +30,9 @@ export const ModelStatusBar: React.FC<ModelStatusBarProps> = ({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surfaceVariant }]}>
+    <View style={[styles.container, { backgroundColor: colors.glassBg, borderBottomColor: colors.glassBorder }]}>
       <View style={styles.leftSection}>
-        <View style={[styles.dot, { backgroundColor: colors.success }]} />
+        <View style={[styles.dot, { backgroundColor: colors.success, shadowColor: colors.success }]} />
         <Text style={[styles.modelName, { color: colors.text }]} numberOfLines={1}>
           {activeModel.name}
         </Text>
@@ -63,6 +64,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
   },
   leftSection: {
     flexDirection: 'row',
@@ -72,8 +74,11 @@ const styles = StyleSheet.create({
   dot: {
     width: 8,
     height: 8,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     marginRight: SPACING.sm,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
   },
   modelName: {
     fontSize: FONT_SIZES.sm,

@@ -1,5 +1,5 @@
-// Design tokens for PocketLLM v3.0
-// Unified spacing, radius, typography, and elevation system
+// Design tokens for PocketLLM v3.1 — Aurora Glass
+// Glassmorphism + violet/indigo glow system for all 4 themes
 
 export const SPACING = {
   none: 0,
@@ -15,17 +15,25 @@ export const SPACING = {
   '4xl': 48,
   '5xl': 64,
   '6xl': 80,
+  // Backwards-compat aliases
+  huge: 48,
+  xxl: 32,
+  xxxl: 40,
 } as const;
 
 export const RADIUS = {
   none: 0,
   xs: 4,
-  sm: 6,
+  sm: 8,
   md: 12,
-  lg: 20,
-  xl: 32,
-  '2xl': 40,
+  lg: 16,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 32,
   full: 9999,
+  // Backwards-compat aliases
+  xxl: 24,
+  xxxl: 32,
 } as const;
 
 export const FONT_SIZES = {
@@ -38,6 +46,11 @@ export const FONT_SIZES = {
   '2xl': 30,
   '3xl': 38,
   '4xl': 48,
+  // Backwards-compat aliases (legacy index.ts values)
+  xxl: 24,
+  xxxl: 32,
+  display: 40,
+  hero: 48,
 } as const;
 
 export const FONT_WEIGHTS = {
@@ -65,31 +78,31 @@ export const ELEVATION = {
   },
   2: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 3,
   },
   3: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    elevation: 6,
   },
   4: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
   },
   5: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.22,
+    shadowRadius: 32,
+    elevation: 14,
   },
 } as const;
 
@@ -107,12 +120,19 @@ export const ANIMATION = {
 export type ThemeName = 'midnight' | 'aurora' | 'solar' | 'void';
 
 export interface ThemeColors {
-  // Backgrounds
+  // Backgrounds (layered for depth)
   background: string;
+  backgroundDeep: string;
   backgroundSecondary: string;
   surface: string;
   surfaceVariant: string;
   surfaceElevated: string;
+
+  // Glass surfaces
+  glassBg: string;
+  glassBgStrong: string;
+  glassBorder: string;
+  glassHighlight: string;
 
   // Text
   text: string;
@@ -126,6 +146,11 @@ export interface ThemeColors {
   primaryLight: string;
   secondary: string;
   accent: string;
+
+  // Gradient stops (for primary button/header)
+  gradientStart: string;
+  gradientMid: string;
+  gradientEnd: string;
 
   // Bubbles
   userBubble: string;
@@ -145,51 +170,73 @@ export interface ThemeColors {
   overlay: string;
   highlight: string;
   glow: string;
+  glowStrong: string;
+  inputBackground: string;
 }
 
+// Midnight — default. Deep indigo + violet glow.
 const midnight: ThemeColors = {
-  background: '#0A0E1A',
-  backgroundSecondary: '#0F1420',
+  background: '#0A0B1E',
+  backgroundDeep: '#050614',
+  backgroundSecondary: '#0F1129',
   surface: 'rgba(255, 255, 255, 0.04)',
-  surfaceVariant: 'rgba(255, 255, 255, 0.08)',
-  surfaceElevated: 'rgba(255, 255, 255, 0.10)',
+  surfaceVariant: 'rgba(255, 255, 255, 0.07)',
+  surfaceElevated: 'rgba(255, 255, 255, 0.09)',
 
-  text: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textTertiary: '#64748B',
+  glassBg: 'rgba(255, 255, 255, 0.05)',
+  glassBgStrong: 'rgba(20, 20, 40, 0.85)',
+  glassBorder: 'rgba(255, 255, 255, 0.10)',
+  glassHighlight: 'rgba(255, 255, 255, 0.18)',
+
+  text: '#F8FAFC',
+  textSecondary: '#B4B6CC',
+  textTertiary: '#7A7E96',
   textInverse: '#0F172A',
 
-  primary: '#6366F1',
-  primaryDark: '#4F46E5',
-  primaryLight: '#818CF8',
-  secondary: '#8B5CF6',
-  accent: '#EC4899',
+  primary: '#7C3AED',
+  primaryDark: '#5B21B6',
+  primaryLight: '#A78BFA',
+  secondary: '#6366F1',
+  accent: '#22D3EE',
 
-  userBubble: '#6366F1',
+  gradientStart: '#A78BFA',
+  gradientMid: '#7C3AED',
+  gradientEnd: '#6366F1',
+
+  userBubble: '#7C3AED',
   userBubbleText: '#FFFFFF',
   assistantBubble: 'rgba(255, 255, 255, 0.05)',
-  assistantBubbleText: '#F1F5F9',
+  assistantBubbleText: '#F8FAFC',
 
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  success: '#34D399',
+  warning: '#FBBF24',
+  error: '#F87171',
+  info: '#60A5FA',
 
   border: 'rgba(255, 255, 255, 0.08)',
   divider: 'rgba(255, 255, 255, 0.05)',
-  overlay: 'rgba(0, 0, 0, 0.6)',
-  highlight: 'rgba(99, 102, 241, 0.15)',
-  glow: 'rgba(99, 102, 241, 0.3)',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+  highlight: 'rgba(124, 58, 237, 0.18)',
+  glow: 'rgba(124, 58, 237, 0.30)',
+  glowStrong: 'rgba(124, 58, 237, 0.55)',
+  inputBackground: 'rgba(255, 255, 255, 0.06)',
 };
 
+// Aurora — light. White glass + soft lavender.
 const aurora: ThemeColors = {
-  background: '#FFFFFF',
-  backgroundSecondary: '#F8FAFC',
-  surface: 'rgba(99, 102, 241, 0.04)',
-  surfaceVariant: 'rgba(99, 102, 241, 0.08)',
+  background: '#F5F3FF',
+  backgroundDeep: '#EDE9FE',
+  backgroundSecondary: '#FFFFFF',
+  surface: 'rgba(255, 255, 255, 0.6)',
+  surfaceVariant: 'rgba(99, 102, 241, 0.06)',
   surfaceElevated: '#FFFFFF',
 
-  text: '#0F172A',
+  glassBg: 'rgba(255, 255, 255, 0.65)',
+  glassBgStrong: 'rgba(255, 255, 255, 0.92)',
+  glassBorder: 'rgba(124, 58, 237, 0.10)',
+  glassHighlight: 'rgba(255, 255, 255, 1)',
+
+  text: '#1E1B4B',
   textSecondary: '#475569',
   textTertiary: '#94A3B8',
   textInverse: '#FFFFFF',
@@ -200,29 +247,42 @@ const aurora: ThemeColors = {
   secondary: '#A855F7',
   accent: '#EC4899',
 
+  gradientStart: '#A78BFA',
+  gradientMid: '#7C3AED',
+  gradientEnd: '#6366F1',
+
   userBubble: '#6366F1',
   userBubbleText: '#FFFFFF',
   assistantBubble: 'rgba(99, 102, 241, 0.06)',
-  assistantBubbleText: '#0F172A',
+  assistantBubbleText: '#1E1B4B',
 
   success: '#059669',
   warning: '#D97706',
   error: '#DC2626',
   info: '#2563EB',
 
-  border: 'rgba(15, 23, 42, 0.08)',
-  divider: 'rgba(15, 23, 42, 0.05)',
-  overlay: 'rgba(15, 23, 42, 0.4)',
-  highlight: 'rgba(99, 102, 241, 0.1)',
-  glow: 'rgba(99, 102, 241, 0.2)',
+  border: 'rgba(99, 102, 241, 0.12)',
+  divider: 'rgba(99, 102, 241, 0.06)',
+  overlay: 'rgba(30, 27, 75, 0.4)',
+  highlight: 'rgba(99, 102, 241, 0.10)',
+  glow: 'rgba(99, 102, 241, 0.18)',
+  glowStrong: 'rgba(99, 102, 241, 0.32)',
+  inputBackground: 'rgba(255, 255, 255, 0.7)',
 };
 
+// Solar — warm cream + amber glow.
 const solar: ThemeColors = {
   background: '#FAF6EE',
-  backgroundSecondary: '#F5E9D3',
+  backgroundDeep: '#F2E9D5',
+  backgroundSecondary: '#FFFCF5',
   surface: 'rgba(234, 88, 12, 0.04)',
   surfaceVariant: 'rgba(234, 88, 12, 0.08)',
   surfaceElevated: '#FFFCF5',
+
+  glassBg: 'rgba(255, 252, 245, 0.75)',
+  glassBgStrong: 'rgba(255, 252, 245, 0.95)',
+  glassBorder: 'rgba(234, 88, 12, 0.14)',
+  glassHighlight: 'rgba(255, 255, 255, 1)',
 
   text: '#451A03',
   textSecondary: '#78350F',
@@ -235,9 +295,13 @@ const solar: ThemeColors = {
   secondary: '#D97706',
   accent: '#B45309',
 
+  gradientStart: '#FB923C',
+  gradientMid: '#EA580C',
+  gradientEnd: '#C2410C',
+
   userBubble: '#EA580C',
   userBubbleText: '#FFFCF5',
-  assistantBubble: 'rgba(234, 88, 12, 0.06)',
+  assistantBubble: 'rgba(234, 88, 12, 0.05)',
   assistantBubbleText: '#451A03',
 
   success: '#16A34A',
@@ -245,19 +309,28 @@ const solar: ThemeColors = {
   error: '#B91C1C',
   info: '#0284C7',
 
-  border: 'rgba(69, 26, 3, 0.1)',
-  divider: 'rgba(69, 26, 3, 0.06)',
+  border: 'rgba(234, 88, 12, 0.16)',
+  divider: 'rgba(234, 88, 12, 0.08)',
   overlay: 'rgba(69, 26, 3, 0.4)',
-  highlight: 'rgba(234, 88, 12, 0.12)',
-  glow: 'rgba(234, 88, 12, 0.25)',
+  highlight: 'rgba(234, 88, 12, 0.10)',
+  glow: 'rgba(234, 88, 12, 0.22)',
+  glowStrong: 'rgba(234, 88, 12, 0.40)',
+  inputBackground: 'rgba(255, 252, 245, 0.8)',
 };
 
+// Void — true black + magenta.
 const voidTheme: ThemeColors = {
   background: '#000000',
+  backgroundDeep: '#000000',
   backgroundSecondary: '#0A0A0A',
   surface: 'rgba(236, 72, 153, 0.04)',
   surfaceVariant: 'rgba(236, 72, 153, 0.08)',
-  surfaceElevated: '#121212',
+  surfaceElevated: '#0F0F10',
+
+  glassBg: 'rgba(255, 255, 255, 0.04)',
+  glassBgStrong: 'rgba(15, 15, 16, 0.92)',
+  glassBorder: 'rgba(236, 72, 153, 0.16)',
+  glassHighlight: 'rgba(255, 255, 255, 0.12)',
 
   text: '#F5F5F5',
   textSecondary: '#A1A1AA',
@@ -270,9 +343,13 @@ const voidTheme: ThemeColors = {
   secondary: '#A855F7',
   accent: '#8B5CF6',
 
+  gradientStart: '#F472B6',
+  gradientMid: '#EC4899',
+  gradientEnd: '#A855F7',
+
   userBubble: '#EC4899',
   userBubbleText: '#FFFFFF',
-  assistantBubble: 'rgba(236, 72, 153, 0.06)',
+  assistantBubble: 'rgba(236, 72, 153, 0.05)',
   assistantBubbleText: '#F5F5F5',
 
   success: '#22C55E',
@@ -282,9 +359,11 @@ const voidTheme: ThemeColors = {
 
   border: 'rgba(255, 255, 255, 0.08)',
   divider: 'rgba(255, 255, 255, 0.04)',
-  overlay: 'rgba(0, 0, 0, 0.7)',
+  overlay: 'rgba(0, 0, 0, 0.8)',
   highlight: 'rgba(236, 72, 153, 0.15)',
-  glow: 'rgba(236, 72, 153, 0.3)',
+  glow: 'rgba(236, 72, 153, 0.30)',
+  glowStrong: 'rgba(236, 72, 153, 0.55)',
+  inputBackground: 'rgba(255, 255, 255, 0.05)',
 };
 
 const themes: Record<ThemeName, ThemeColors> = {
@@ -303,4 +382,11 @@ export const THEME_LABELS: Record<ThemeName, string> = {
   aurora: 'Aurora',
   solar: 'Solar',
   void: 'Void',
+};
+
+export const THEME_DESCRIPTIONS: Record<ThemeName, string> = {
+  midnight: 'Deep indigo with violet glow',
+  aurora: 'Light glass with lavender',
+  solar: 'Warm cream with amber',
+  void: 'Pure black with magenta',
 };

@@ -15,7 +15,8 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useWorkspaceStore, FileItem } from '../store/useWorkspaceStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 
 const getFileIcon = (fileName: string, isDirectory: boolean) => {
   if (isDirectory) return { name: 'folder', color: '#3b82f6' };
@@ -42,7 +43,7 @@ const getFileIcon = (fileName: string, isDirectory: boolean) => {
 
 export const IdeScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
 
   const {
     files,
@@ -335,7 +336,7 @@ export const IdeScreen: React.FC = () => {
                       style={[
                         styles.tabItem,
                         { backgroundColor: isTabActive ? colors.surface : 'transparent', borderBottomColor: isTabActive ? colors.primary : 'transparent' },
-                        isTabActive && SHADOWS.xs,
+                        isTabActive && { borderRadius: RADIUS.xs },
                       ]}
                       onPress={() => setActiveFileId(tabId)}
                       activeOpacity={0.8}
@@ -453,7 +454,7 @@ export const IdeScreen: React.FC = () => {
 
       {/* Floating Agent Watcher Console logs drawer */}
       {showAgentLog && (
-        <View style={[styles.agentLogTray, { backgroundColor: colors.surface, borderTopColor: colors.border }, SHADOWS.md]}>
+        <View style={[styles.agentLogTray, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <View style={[styles.agentLogHeader, { borderBottomColor: colors.border }]}>
             <View style={styles.agentLogTitle}>
               <View style={[styles.logIndicatorPulse, { backgroundColor: colors.success }]} />
@@ -572,7 +573,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: SPACING.md,
     paddingVertical: 5,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   headerBtnText: {
     fontSize: FONT_SIZES.xs,
@@ -614,6 +615,7 @@ const styles = StyleSheet.create({
   },
   fileListContent: {
     paddingVertical: SPACING.xs,
+    paddingBottom: 110,
   },
   fileItem: {
     flexDirection: 'row',
@@ -643,7 +645,7 @@ const styles = StyleSheet.create({
   newFileInput: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     paddingHorizontal: 8,
     paddingVertical: 4,
     fontSize: FONT_SIZES.xs,
@@ -651,7 +653,7 @@ const styles = StyleSheet.create({
   addBtn: {
     width: 26,
     height: 26,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -667,6 +669,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.sm,
     gap: 4,
+    paddingBottom: 110,
   },
   tabItem: {
     flexDirection: 'row',
@@ -692,6 +695,7 @@ const styles = StyleSheet.create({
   },
   editorScrollContent: {
     flexGrow: 1,
+    paddingBottom: 110,
   },
   codeContainerRow: {
     flexDirection: 'row',
@@ -742,7 +746,7 @@ const styles = StyleSheet.create({
   emptyIconBox: {
     width: 64,
     height: 64,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: RADIUS.xxl,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
@@ -790,6 +794,7 @@ const styles = StyleSheet.create({
   agentLogContent: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
+    paddingBottom: 110,
   },
   noLogText: {
     fontSize: FONT_SIZES.xs - 1,
@@ -845,7 +850,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING.md,
     paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
   },
   wsActionText: {
     fontSize: FONT_SIZES.xs,
@@ -860,11 +865,12 @@ const styles = StyleSheet.create({
   keyboardScroll: {
     alignItems: 'center',
     gap: 6,
+    paddingBottom: 110,
   },
   keyboardKey: {
     minWidth: 36,
     height: 32,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -881,8 +887,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   templateSheet: {
-    borderTopLeftRadius: BORDER_RADIUS.xxl,
-    borderTopRightRadius: BORDER_RADIUS.xxl,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.huge,
     maxHeight: Dimensions.get('window').height * 0.65,
@@ -890,7 +896,7 @@ const styles = StyleSheet.create({
   templateHandle: {
     width: 40,
     height: 4,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     backgroundColor: '#CCCCCC',
     alignSelf: 'center',
     marginTop: SPACING.md,
@@ -920,7 +926,7 @@ const styles = StyleSheet.create({
   templateIconBox: {
     width: 48,
     height: 48,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -939,7 +945,7 @@ const styles = StyleSheet.create({
   templateCancelBtn: {
     marginTop: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: RADIUS.xxl,
     alignItems: 'center',
   },
   templateCancelText: {
@@ -947,3 +953,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+

@@ -13,11 +13,12 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useWorkspaceStore, CommandHistory } from '../store/useWorkspaceStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 
 export const TerminalScreen: React.FC = () => {
   const { darkMode } = useSettingsStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
   const [command, setCommand] = useState('');
 
   const { terminalHistory, addTerminalCommand, clearTerminalHistory, files } = useWorkspaceStore();
@@ -456,6 +457,7 @@ const styles = StyleSheet.create({
   },
   outputContent: {
     padding: SPACING.md,
+    paddingBottom: 110,
   },
   historyItem: {
     marginBottom: SPACING.md,
@@ -489,11 +491,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     gap: 6,
+    paddingBottom: 110,
   },
   suggestionPill: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
   },
   suggestionText: {
@@ -506,6 +509,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm - 2,
+    paddingBottom: 100,
     borderTopWidth: 1,
     gap: SPACING.sm,
   },
@@ -518,7 +522,7 @@ const styles = StyleSheet.create({
   clearBtn: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -531,7 +535,7 @@ const styles = StyleSheet.create({
   terminalIconWrapper: {
     width: 54,
     height: 54,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.sm,
@@ -547,3 +551,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+

@@ -17,7 +17,8 @@ import { useHistoryStore } from '../store/useHistoryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useChatStore } from '../store/useChatStore';
 import { useModelStore } from '../store/useModelStore';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../theme';
+import { useTheme } from '../hooks/useTheme';
+import { SPACING, FONT_SIZES, RADIUS } from '../theme/tokens';
 import { Conversation } from '../services/Database';
 
 export const ConversationListScreen: React.FC<{ navigation: any }> = ({
@@ -34,7 +35,7 @@ export const ConversationListScreen: React.FC<{ navigation: any }> = ({
     useHistoryStore();
   const { setMessages, clearMessages } = useChatStore();
   const { activeModel } = useModelStore();
-  const colors = darkMode ? COLORS.dark : COLORS.light;
+  const { colors } = useTheme();
 
   useEffect(() => {
     loadConversations();
@@ -109,7 +110,7 @@ export const ConversationListScreen: React.FC<{ navigation: any }> = ({
 
   const renderItem = ({ item }: { item: Conversation }) => (
     <TouchableOpacity
-      style={[styles.item, { backgroundColor: colors.surface }, SHADOWS.xs]}
+      style={[styles.item, { backgroundColor: colors.surface }]}
       onPress={() => handleOpenConversation(item)}
       activeOpacity={0.7}
     >
@@ -155,7 +156,7 @@ export const ConversationListScreen: React.FC<{ navigation: any }> = ({
       </View>
 
       {/* Search */}
-      <View style={[styles.searchBox, { backgroundColor: colors.surface }, SHADOWS.xs]}>
+      <View style={[styles.searchBox, { backgroundColor: colors.surface }]}>
         <Icon name="search-outline" size={18} color={colors.textTertiary} />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
   newBtn: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
     margin: SPACING.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: RADIUS.xxl,
     gap: SPACING.sm,
   },
   searchInput: {
@@ -250,20 +251,20 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: 110,
     gap: SPACING.sm,
   },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     marginBottom: SPACING.sm,
   },
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: RADIUS.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -315,7 +316,7 @@ const styles = StyleSheet.create({
   emptyBtn: {
     paddingHorizontal: SPACING.xxl,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: RADIUS.xxl,
   },
   emptyBtnText: {
     color: '#FFFFFF',

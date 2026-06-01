@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, Image, TouchableOpacity, Alert } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { ChatMessage } from '../types';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../theme';
 import Markdown from 'react-native-markdown-display';
@@ -156,6 +157,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             >
               {responseContent || ' '}
             </Markdown>
+            {!isUser && responseContent && (
+              <TouchableOpacity
+                style={[styles.copyButton, { backgroundColor: colors.primary + '10' }]}
+                onPress={() => {
+                  Clipboard.setString(responseContent);
+                  Alert.alert('Copied', 'Response copied to clipboard');
+                }}
+                activeOpacity={0.7}
+              >
+                <Icon name="copy-outline" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
           </>
         )}
         {message.isStreaming && (
@@ -258,5 +271,12 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     marginLeft: 4,
+  },
+  copyButton: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    padding: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
   },
 });
